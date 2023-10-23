@@ -11,5 +11,5 @@ yarn run build
 
 截图
 
-![home][./screenshot/home.png]
-![shell][./screenshot/shell.png]
+![home](./screenshot/home.png)
+![shell](./screenshot/shell.png)
