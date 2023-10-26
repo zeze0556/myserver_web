@@ -16,7 +16,7 @@ import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogAc
 import bcachefs from '../utils/bcachefs';
 import {DataContext} from "../store/global_data.js";
 import BlockDevice from "./BlockDevice";
-let count = 0;
+
 const Home = ()=>{
     const [disks, set_disks] = useState([]);
     const [pools, setPools] = useState([]);
@@ -263,10 +263,8 @@ const Home = ()=>{
 
     const MyTest = ()=> {
         if(openAddDialog) {
-            count++;
             return <div>
             <JsonEditorForm schema={schema} ref={jsonEditorFormRef} data={data}/>
-                     <div>{count}</div>
                    </div>;
         } else {
             return <></>;

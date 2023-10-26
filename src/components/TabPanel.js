@@ -1,30 +1,72 @@
-import { useState } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Tab, Tabs, Box } from '@mui/material';
+import {DataContext} from "../store/global_data.js";
+import RixDynamicComponent from "../rix/RixDynamicComponent.js";
 
-//import Parameters from "./Parameters";
-import Setting from "./Setting";
-import Home from "./Home";
-import Shell from "./Shell";
+let paths = {
+    'home': {
+        'rix_type': 'component',
+        path: 'components/Home.js',
+    },
+    'setting': {
+        'rix_type': 'component',
+        path: 'components/Setting.js',
+
+    },
+    'shell': {
+        'rix_type': 'component',
+        path: 'components/Shell.js',
+
+    },
+    'login': {
+        'rix_type': 'component',
+        path: 'components/Login.js',
+    }
+};
 
 function TabPanel() {
-    const [currentTab, setCurrentTab] = useState('home');
-
+    const [currentTab, setCurrentTab] = useState('login');
+    const [login, update_login] = useState({});
+    const global_data = useContext(DataContext);
+    useEffect(()=> {
+        let w = (v)=> {
+            setCurrentTab('home');
+        };
+        global_data.watch('user', w);
+        return ()=> {
+            global_data.unwatch('user', w);
+        };
+    },[]);
     const handleChange = (event, newValue) => {
         setCurrentTab(newValue);
     };
-
-    return (
-            <Box>
-            <Tabs value={currentTab} onChange={handleChange}>
-            <Tab label="Home" value="home"/>
-            <Tab label="配置" value="setting"/>
+    let Render = (props)=> {
+        let one = paths[currentTab];
+        if(one) {
+            let new_props = {...props,
+                             ...one,
+                            };
+            return <RixDynamicComponent {...new_props}/>;
+        }
+        return <></>;
+    };
+    let Render_All=(props)=> {
+        if(currentTab == 'login') {
+            let new_props = {...props,
+                             ...paths['login'],
+                            };
+            return <RixDynamicComponent {...new_props}/>;
+        } else {
+            return <><Tabs value={currentTab} onChange={handleChange}>
+              <Tab label="Home" value="home"/>
+              <Tab label="配置" value="setting"/>
               <Tab label="SHELL" value="shell"/>
             </Tabs>
-            {currentTab === 'home' && <div><Home/></div>}
-        {currentTab === 'setting' && <div><Setting/></div>}
-              {currentTab === 'shell' && <div><Shell/></div>}
-        </Box>
-    );
+            <Render/>
+                   </>;
+        }
+    };
+    return (<Box><Render_All/></Box>);
 }
 
 export default TabPanel;

@@ -57,6 +57,7 @@ export const init_data = {
     user:{},
     api_token: '',
     disks:{},
+    navigation_enable:false,
     ...WatchData
     //shortlist_notify:()=>{},
     //update:()=>{},
