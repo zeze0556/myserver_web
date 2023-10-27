@@ -46,7 +46,7 @@ function Pool(props) {
                 if(index>=0) {
                     pools.splice(index,1,pool);
                 }
-                let write_ret = await api.config_file({filename:'config/pools.config', 'op':"put", data: pools});
+                let write_ret = await api.config_file({filename:'config/pools.config', 'op':"put", data: JSON.stringify(pools)});
                 if(write_ret.ret == 0) {
                     update_labels(pool.label);
                     global_data.set('pools', pools);

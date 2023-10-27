@@ -199,7 +199,7 @@ const Home = ()=>{
                     } else {
                         pool.label.push({name: config.label, path: config.device});
                     }
-                    let write_ret = await api.config_file({filename:'config/pools.config', 'op':"put", data: pools});
+                    let write_ret = await api.config_file({filename:'config/pools.config', 'op':"put", data: JSON.stringify(pools)});
                     if(write_ret.ret == 0) {
                         global_data.set('pools', pools);
                         setOpenAddDialog(false);
@@ -223,7 +223,7 @@ const Home = ()=>{
                         cur_pools.push(config);
                     }
                     global_data.set('pools', cur_pools);
-                    let write_config_ret = await api.config_file({op:'put', filename:'config/pools.config', data: cur_pools});
+                    let write_config_ret = await api.config_file({op:'put', filename:'config/pools.config', data: JSON.stringify(cur_pools)});
                     if(write_config_ret.ret == 0) {
                         console.log("write_config ok=", write_config_ret);
                     }
@@ -274,9 +274,9 @@ const Home = ()=>{
         let disk_config = await api.config_file({filename:'disk.config', op:'get'});
         console.log("disk_config==", disk_config);
         if(disk_config.ret == -2) {
-            let d_w_ret = await api.config_file({filename:'disk.config', op:'put', data:{
+            let d_w_ret = await api.config_file({filename:'disk.config', op:'put', data:JSON.stringify({
                 blockdevices:global_data.get('blockdevices')
-            }});
+            })});
             console.log("d_w_ret=", d_w_ret);
         }
     };

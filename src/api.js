@@ -107,7 +107,7 @@ const api = {
         case 'put': {
             const response = await axios.put(`/api/file/put`, {
                 filename: `${data.filename}`,
-                data: JSON.stringify(data.data)
+                data: data.data
             });
             return response.data;
         }

@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { Tab, Tabs, Box } from '@mui/material';
 import {DataContext} from "../store/global_data.js";
 import RixDynamicComponent from "../rix/RixDynamicComponent.js";
+import axios from 'axios';
 
 let paths = {
     'home': {
@@ -28,11 +29,19 @@ function TabPanel() {
     const [currentTab, setCurrentTab] = useState('login');
     const [login, update_login] = useState({});
     const global_data = useContext(DataContext);
+    let check_login = async ()=> {
+        const response = await axios.post('/api/userinfo');
+        let ret = response.data;
+        if(ret.ret == 0) {
+            global_data.set('user', {username: ret.data.username});
+        }
+    };
     useEffect(()=> {
         let w = (v)=> {
             setCurrentTab('home');
         };
         global_data.watch('user', w);
+        check_login();
         return ()=> {
             global_data.unwatch('user', w);
         };
