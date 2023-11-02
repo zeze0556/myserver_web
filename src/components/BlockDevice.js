@@ -139,34 +139,4 @@ function BlockDevice(props){
        </>;
 };
 
-/*
-function BlockDevice(props) {
-    const [disks, update_disks] = useState([]);
-    const global_data = useContext(DataContext);
-    const [data, update_data] = useState([]);
-    //let data = props.data.map(v=>{return {path:v.path, model:v.model};});
-    //update_disks(data);
-    //let data = props.data;
-    useEffect(()=> {
-        let sysdata_update = (v)=> {
-            console.log("sysstate==", data, Date.now());
-            update_disks(data);
-        };
-        global_data.watch('sysstat', sysdata_update);
-        return ()=> {
-            global_data.unwatch('sysstat', sysdata_update);
-        };
-    },[data]);
-    useEffect(()=> {
-        let data = props.data.map(v=>{return {path:v.path, model:v.model};});
-        update_data(data);
-    },[props.data]);
-    let Render = ()=> {
-        return <div>{JSON.stringify(disks)}</div>;
-    };
-    //return <div>{JSON.stringify(disks)}</div>;
-    return <Render/>;
-
-}*/
-
 export default BlockDevice;

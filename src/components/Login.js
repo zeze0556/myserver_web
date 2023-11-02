@@ -50,13 +50,6 @@ export default function SignIn() {
       } catch (e) {
           console.log("except==", e);
       }
-
-      /*
-    console.log({
-      email: data.get('email'),
-      password: data.get('password'),
-    });
-    */
   };
 
   return (

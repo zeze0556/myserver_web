@@ -104,7 +104,7 @@ class Disk_Select extends JSONEditor.AbstractEditor{
     }
 }
 const JsonEditorForm = forwardRef((props, ref) => {
-    const { schema, callbacks } = props;
+    const { schema, callbacks} = props;
     const editorRef = useRef(null);
     const containerRef = useRef(null);
     const global_data = useContext(DataContext);
@@ -114,9 +114,10 @@ const JsonEditorForm = forwardRef((props, ref) => {
             return 'disk_select';
         }
     });
-    if(editorRef.current&&props.data) {
-        editorRef.current.setValue(props.data);
-    }
+    console.log("props===", props, editorRef.current);
+    //if(editorRef.current&&props.data) {
+    //    editorRef.current.setValue(props.data);
+    //}
     useEffect(() => {
         //if(editorRef.current) return;
         let options = {
@@ -130,12 +131,17 @@ const JsonEditorForm = forwardRef((props, ref) => {
             //required_by_default: true,
         };
         editorRef.current = new JSONEditor(containerRef.current, options);
+        editorRef.current.on('ready',() => {
+            // Now the api methods will be available
+            if(props.data)
+            editorRef.current.setValue(props.data);
+        });
         return () => {
             if (editorRef.current) {
                 editorRef.current.destroy();
             }
         };
-    }, [schema]);
+    }, [schema,props]);
 
     const getValue = () => {
         return editorRef.current.getValue();

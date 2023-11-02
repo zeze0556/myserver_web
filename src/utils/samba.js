@@ -24,8 +24,19 @@ const samba = {
         throw ret;
     },
     async start() {
+        //ubuntu:systemctl start smbd.service
+        let p = {
+            command: "systemctl",
+            args:["start", "smbd.service"]
+        };
+        return await api.run_command(p);
     },
     async stop() {
+        let p = {
+            command: "systemctl",
+            args:["stop", "smbd.service"]
+        };
+        return await api.run_command(p);
     },
     async restart() {
         await this.start();

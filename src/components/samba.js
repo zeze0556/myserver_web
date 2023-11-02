@@ -30,7 +30,6 @@ export default function SambaSetting() {
     const jsonEditorFormRef = useRef(null);
     let init = async()=> {
         let conf = await samba.get_config();
-        console.log("conf==", conf);
         update_content(conf);
     };
     useEffect(()=> {
@@ -40,7 +39,6 @@ export default function SambaSetting() {
     let update_config = async()=> {
         try {
             let config = jsonEditorFormRef.current.getValue();
-            console.log("new config==", config);
             let conf = await samba.save_config(config);
             update_content(conf);
         } catch (e) {
