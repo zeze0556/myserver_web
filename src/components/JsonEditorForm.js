@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useRef, useContext, forwardRef, useImperativeHandle, Fragment } from 'react';
 import ReactDOM from 'react-dom/client';
-import {DataContext, rix_make_watch_data} from "../store/global_data.js";
+import { useData,rix_make_watch_data } from "../store/global_data.js";
 import {Autocomplete, TextField} from '@mui/material';
 
 let JSONEditor = window.JSONEditor;
@@ -32,20 +32,22 @@ class Disk_Select extends JSONEditor.AbstractEditor{
             });
         }
         this.set_model = (v)=> {
-            let pr = this.parent.jsoneditor.getEditor(this.parent.path+'.model');
-            if(pr&&this.disks) {
-                let v2 = v;
-                let model = this.disks.filter(v=>v.path == v2)[0];
-                if(model) {
-                    pr.setValue(model.model);
+            if (self.parent && self.parent.jsoneditor) {
+                let pr = self.parent.jsoneditor.getEditor(self.parent.path + '.model');
+                if (pr && self.disks) {
+                    let v2 = v;
+                    let model = self.disks.filter(v => v.path == v2)[0];
+                    if (model) {
+                        pr.setValue(model.model);
+                    }
                 }
             }
         };
         this.used_disks.watch('cur_path', this.set_model);
+        const {global_data} = this.defaults;//useData();
         let MyRender = ()=> {
             const [options, setOptions] = useState([]);
             const [value, setValue] = useState('');
-            const global_data = useContext(DataContext);
             if(!disks) disks = global_data.get('blockdevices');
             this.disks = disks;
             useEffect(() => {
@@ -99,22 +101,24 @@ class Disk_Select extends JSONEditor.AbstractEditor{
         return this.value;
     }
     destroy() {
+        this.used_disks.unwatch(this.set_model);
+        setTimeout(()=> {
         this.view_root.unmount();
-        this.used_disk.unwatch(this.set_model);
+        });
     }
 }
 const JsonEditorForm = forwardRef((props, ref) => {
     const { schema, callbacks} = props;
     const editorRef = useRef(null);
     const containerRef = useRef(null);
-    const global_data = useContext(DataContext);
+    const {global_data} = useData();
     JSONEditor.defaults.editors.disk_select= Disk_Select;
+    JSONEditor.defaults.global_data = global_data;
     JSONEditor.defaults.resolvers.unshift(function (schema) {
         if (schema.type === 'string' && schema.format === 'disk_select') {
             return 'disk_select';
         }
     });
-    console.log("props===", props, editorRef.current);
     //if(editorRef.current&&props.data) {
     //    editorRef.current.setValue(props.data);
     //}

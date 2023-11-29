@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef,useContext } from 'react';
 import samba from '../utils/samba';
 import JsonEditorForm from './JsonEditorForm';
+import { useData } from "../store/global_data.js";
 
 import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TableContainer,
          TableHead,
@@ -13,9 +14,10 @@ import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogAc
          Box,
          Modal
        } from '@mui/material';
+import CommonWindow from './CommonWindow';
 
-
-export default function SambaSetting() {
+export default function SambaSetting(props) {
+    const { global_data, api } = useData();
     let [content,update_content] = useState("");
     const [schema, setSchema] = useState({
         "type": "string",
@@ -49,7 +51,8 @@ export default function SambaSetting() {
     let restart = async()=> {
         await samba.restat();
     };
-    return <Container style={{width:"100vh",
+    return <><CommonWindow title="共享服务器" {...props}>
+    <Container style={{width:"100vh",
                               height:"100%",
                              }}>
         <JsonEditorForm schema={schema}
@@ -60,5 +63,8 @@ export default function SambaSetting() {
                                }} />
              <Button onClick={update_config}>更新</Button>
              <Button onClick={restart}>重启</Button>
-           </Container>;
+           </Container>
+    </CommonWindow>
+    </>
+    ;
 }

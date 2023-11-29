@@ -1,5 +1,7 @@
 import React, {useState, useCallback, useContext}from 'react';
 
+import Api from "../api.js";
+
 export const WatchData = {
     watchlist:{},
     set(key,v){
@@ -76,16 +78,17 @@ export function useData() {
 };
 
 
-export default function DataProvider ({ children }) {
+export const DataProvider = ({ children }) => {
     //const [update, setUpdate] = useState(0);
 
     const contextValue = {
         ...init_data,
         //update: useCallback(() => setUpdate(update+1), []),
     };
+    Api.Init(contextValue);
 
     return (
-            <DataContext.Provider value={contextValue}>
+        <DataContext.Provider value={{global_data:contextValue, make_watch_data:rix_make_watch_data, api: Api}}>
             {children}
         </DataContext.Provider>
     );

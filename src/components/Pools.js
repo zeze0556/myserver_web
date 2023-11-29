@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef,useContext } from 'react';
-import api from '../api';
 import { styled } from '@mui/system';
 import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TableContainer,
          TableHead,
@@ -10,14 +9,14 @@ import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogAc
          TablePagination,
        } from '@mui/material';
 import bcachefs from '../utils/bcachefs.js';
-import {rix_make_watch_data, DataContext} from "../store/global_data.js";
+import {useData} from "../store/global_data.js";
 import BlockDevice from "./BlockDevice";
 
 function Pool(props) {
     
     let pool = props.data;
     console.log("pool=", pool);
-    const global_data = useContext(DataContext);
+    const {global_data,api} = useData();
     const [labels, update_labels] = useState([]);
     useEffect(()=> {
         update_labels(props.data.label);

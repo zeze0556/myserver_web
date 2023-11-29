@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef,useContext } from 'react';
-import api from '../api';
+//import api from '../api';
 import { styled } from '@mui/system';
 import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TableContainer,
          TableHead,
@@ -10,7 +10,7 @@ import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogAc
          TablePagination,
        } from '@mui/material';
 
-import {DataContext} from "../store/global_data.js";
+import {useData} from "../store/global_data.js";
 
 
 function BlockDevice(props){
@@ -28,12 +28,13 @@ function BlockDevice(props){
             return value.toString().toLowerCase().includes(filter.toLowerCase());
         });
     });
-    const global_data = useContext(DataContext);
+    const {global_data, api} = useData();
     //disks = data;
     //merger_data(global_data.get('sysstat', []));
     useEffect(()=> {
         let blockdevices = global_data.get('blockdevices');
         let sysdata_update = (v)=> {
+            let blockdevices = global_data.get('blockdevices');
             //let v = global_data.get('sysstat', []);
             //Device             tps    kB_read/s    kB_wrtn/s    kB_dscd/s    kB_read    kB_wrtn    kB_dscd
             let label = data;
@@ -44,6 +45,7 @@ function BlockDevice(props){
                     if(one.path == `/dev/${v.Device}`) return true;
                     return false;
                 })[0];
+                if(!blockdevices) return;
                 let block = blockdevices.filter(v=>v.path === one.path)[0];
                 if(d&&block) {
                     let index = old_data.findIndex(v=>v.path == one.path);
@@ -72,6 +74,8 @@ function BlockDevice(props){
         };
     },[data]);
     useEffect(()=> {
+        console.log("props===", props);
+        if(props.data)
         update_data(props.data);
     },[props.data]);
     const handleChangePage = (event, newPage) => {

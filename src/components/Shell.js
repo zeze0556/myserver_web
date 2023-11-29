@@ -5,28 +5,32 @@ import { AttachAddon} from 'xterm-addon-attach';
 import 'xterm/css/xterm.css';
 import 'xterm/lib/xterm.js';
 import { styled } from '@mui/system';
-import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TableContainer,
-         TableHead,
-         TableRow,
-         TableCell,
-         TableBody,
-         Paper,
-         TablePagination,
+import { 
          Container,
          Box,
-         Modal
        } from '@mui/material';
+import CommonWindow from './CommonWindow';
+
+import {
+    DesktopWindows, Settings, Notifications,
+    Close, Restore,
+    Menu,
+    Home,
+    ChevronLeft,
+    Maximize, Minimize
+} from '@mui/icons-material';
 
 let socket = null;
-export default function Shell() {
+export default function Shell(props) {
     const shell_ref = useRef(null);
     const websocket = useRef(null);
     const terminal = useRef(null);
+    const { onActive, onClose, onRestore, onMaximize, onMinimize } = props;
     useEffect(()=> {
         console.log("api.init=====", window.location.host);
         terminal.current = new Terminal({
-            //rendererType: 'canvas',
-            rows: 40,
+            rendererType: 'canvas',
+            //rows: 40,
             convertEol: true,
             scrollback: 10,
             disableStdin: false,
@@ -38,7 +42,7 @@ export default function Shell() {
         };
         const fitAddon = new FitAddon();
         terminal.current.loadAddon(fitAddon);
-
+        fitAddon.fit();
         let location = window.location;
         websocket.current = new WebSocket((location.protocol=="http:"?"ws://":"wss://")+location.host+"/api/ws/shell");
         // 在连接建立后，将 WebSocket 流导入到 xterm 终端中
@@ -49,8 +53,8 @@ export default function Shell() {
                     websocket.current.send(data);
             });
             terminal.current.onResize((size) => {
+                console.log("size===", size);
                 // 调整 xterm 和 WebSocket 的窗口大小
-                fitAddon.fit();
                 websocket.current.send(JSON.stringify({ resize: size }));
             });
 
@@ -62,6 +66,7 @@ export default function Shell() {
             // 处理关闭连接
             websocket.current.onclose = (event) => {
                 terminal.current.writeln('WebSocket连接已关闭');
+                onClose(event);
                 // 可以在此处添加重连逻辑
             };
             //websocket.current.send("echo $PS1\n");
@@ -82,7 +87,12 @@ export default function Shell() {
             }
         };
     },[]);
-    return <Container maxWidth="sm" width="100vh">
-             <Box ref={shell_ref} width="100vh"/>
-           </Container>;
+    return <><CommonWindow title="终端" {...props}>
+        <Container>
+               <Box ref={shell_ref} width="100vw" height="100vh"
+                    p={2}
+               />
+    </Container>
+             </CommonWindow>
+           </>;
 }

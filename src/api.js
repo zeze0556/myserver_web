@@ -1,14 +1,14 @@
 // api.js
 import axios from 'axios';
 import React, { useState, useEffect, useRef,useContext } from 'react';
-import {init_data} from "./store/global_data.js";
+//import {init_data} from "./store/global_data.js";
 // websocket.js
 //import {io} from 'socket.io-client';
 
 let socket = null;
 
 const api = {
-    Init: function() {
+    Init: function(init_data) {
         this.global_data = init_data;//useContext(DataContext);
         if(socket) return;
         let location = window.location;
@@ -147,6 +147,6 @@ const api = {
         return response.data;
     },
 };
-api.Init();
+//api.Init();
 
 export default api;

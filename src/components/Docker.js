@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef,useContext } from 'react';
 import docker from '../utils/docker';
-import api from '../api';
+//import api from '../api';
 import JsonEditorForm from './JsonEditorForm';
 import { Terminal } from 'xterm';
 import 'xterm/css/xterm.css';
 import 'xterm/lib/xterm.js';
 import { FitAddon } from 'xterm-addon-fit';
 import { AttachAddon} from 'xterm-addon-attach';
-
+import { useData } from "../store/global_data.js";
 import { styled } from '@mui/system';
 import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, TableContainer,
          TableHead,
@@ -20,6 +20,8 @@ import { Table, Pagination, Button, Dialog, DialogTitle, DialogContent, DialogAc
          Box,
          Modal
        } from '@mui/material';
+
+import CommonWindow from './CommonWindow';
 
 function ContainOp(props) {
     const terminal = useRef(null);
@@ -140,7 +142,7 @@ function DockerList(props) {
            </>;
 }
 
-export default function Docker() {
+export default function Docker(props) {
     let [installed, set_installed] = useState(false);
     let [dockerlist, update_dockerlist] = useState([]);
     let [open_dialog, set_open_dialog] = useState(false);
@@ -151,6 +153,7 @@ export default function Docker() {
         env:"",
         config:""
     });
+    const { global_data, api } = useData();
     let get_docker_config = async()=> {
         let read_ret = await api.config_file({filename:'config/docker.config', 'op':"get"});
         if(read_ret.ret == 0 && read_ret.data) {
@@ -334,15 +337,19 @@ export default function Docker() {
                </Dialog>;
 
     };
-    return <Container>
-             {!installed &&
-              <Button onClick={install_docker}>安装docker</Button>
-             }
-             {installed &&
-              <Button onClick={add}>新建容器</Button>
-             }
-             <Running_Docker/>
-             <RenderDialog/>
-             <RenderContainerOp/>
-           </Container>;
+    return <><CommonWindow title="docker" {...props}>
+        <Container>
+            {!installed &&
+                <Button onClick={install_docker}>安装docker</Button>
+            }
+            {installed &&
+                <Button onClick={add}>新建容器</Button>
+            }
+            <Running_Docker />
+            <RenderDialog />
+            <RenderContainerOp />
+        </Container>
+    </CommonWindow>
+    </>;
+
 };
