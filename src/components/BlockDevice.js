@@ -14,31 +14,49 @@ import {useData} from "../store/global_data.js";
 
 
 function BlockDevice(props){
-    const [disks, update_disks] = useState([]);
+    //const [disks, update_disks] = useState([...props.data]);
+
+    const { global_data, api } = useData();
     const [data, update_data] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [poolstatus, set_poolstatus] = useState({online:false,
-                                                   status_text: "离线"
-                                                  });
+    const [poolstatus, set_poolstatus] = useState({
+        online: false,
+        status_text: "离线"
+    });
+    const [config, setConfig] = useState({
+        data: [],
+        disks: props.data || [],
+    });
+    let update_state = (v) => {
+        setConfig((prev) => {
+            return { ...prev, ...v };
+        });
+    };
     const [filter, setFilter] = useState('');
-    const filteredData = disks.filter((row) => {
+    const filteredData = config.disks.filter((row) => {
         return Object.values(row).some((value) => {
             return value.toString().toLowerCase().includes(filter.toLowerCase());
         });
     });
-    const {global_data, api} = useData();
-    //disks = data;
-    //merger_data(global_data.get('sysstat', []));
     useEffect(()=> {
+        update_state({disks:props.data});
         let blockdevices = global_data.get('blockdevices');
         let sysdata_update = (v)=> {
             let blockdevices = global_data.get('blockdevices');
             //let v = global_data.get('sysstat', []);
             //Device             tps    kB_read/s    kB_wrtn/s    kB_dscd/s    kB_read    kB_wrtn    kB_dscd
             let label = data;
-            let old_data = disks;
+            let old_data = [...config.disks,
+                            //...props.data
+                           ];
+            for(let disk of props.data) {
+                let index = old_data.findIndex(v=>v.path == disk.path);
+                if(index < 0) {
+                    old_data.push(disk);
+                }
+            }
             let status = v;//v.hosts[0].statistics[0].disk;
             label.forEach(one=>{
                 let d = status.filter(v=>{
@@ -64,20 +82,22 @@ function BlockDevice(props){
                     }
                 }
             });
-            update_disks([...old_data]);
+            update_state({disks:[...old_data]});
         };
         //sysdata_update([]);
         global_data.watch('sysstat', sysdata_update);
-        update_disks(data);
+        //update_disks(data);
         return ()=> {
             global_data.unwatch('sysstat', sysdata_update);
         };
-    },[data]);
+    },[props.data]);
+    /*
     useEffect(()=> {
         console.log("props===", props);
-        if(props.data)
-        update_data(props.data);
+        //if(props.data)
+        //update_data(props.data);
     },[props.data]);
+    */
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
     };

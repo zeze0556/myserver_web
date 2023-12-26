@@ -65,7 +65,7 @@ const api = {
             console.log("close====");
             socket = null;
             setTimeout(()=> {
-                this.Init();
+                this.Init(init_data);
             }, 5000);
         };
     },

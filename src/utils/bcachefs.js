@@ -74,6 +74,7 @@ const bcachefs = {
     format(config) {
         let args = [];
         args.push("format");
+        args.push("-f");
         args.push(`--compression=${config['compression']}`);
         if(config["encrypted"]) args.push("--encrypted");
         args.push(`--foreground_target=${config['foreground_target']}`);

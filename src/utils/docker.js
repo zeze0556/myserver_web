@@ -1,6 +1,6 @@
 import api from '../api';
 import {init_data} from "../store/global_data.js";
-
+import cmd from "./command.js";
 const docker = {
     docker_config: './docker',
     async get_config(config) {
@@ -30,56 +30,18 @@ const docker = {
         }
     },
     stop_container(config, callback={stdout:null, stderr:null, onerr:null}) {
-        let location = window.location;
         let args = {
             "command": "/bin/bash",
             "args":["-c", `cd ${config.dir} && docker compose stop`]
         };
-        let args_s = encodeURIComponent(JSON.stringify(args));
-        let socket = new WebSocket((location.protocol=="http:"?"ws://":"wss://")+location.host+"/api/ws/shell?args="+args_s);
-        socket.onopen = () => {
-            socket.onclose = ()=> {
-                socket = null;
-            };
-            socket.onmessage = (event)=> {
-                console.log(event.data);
-                if(callback.stdout) {
-                    callback.stdout(event.data);
-                }
-            };
-        };
-        socket.onerror = (err)=> {
-            if(callback.onerr) {
-                callback.onerr(err);
-            }
-            socket = null;
-        };
+        cmd.long_cmd(args, callback);
     },
     start_container(config, callback={stdout:null, stderr:null, onerr:null}) {
-        let location = window.location;
         let args = {
             "command": "/bin/bash",
             "args":["-c", `cd ${config.dir} && docker compose up -d`]
         };
-        let args_s = encodeURIComponent(JSON.stringify(args));
-        let socket = new WebSocket((location.protocol=="http:"?"ws://":"wss://")+location.host+"/api/ws/shell?args="+args_s);
-        socket.onopen = () => {
-            socket.onclose = ()=> {
-                socket = null;
-            };
-            socket.onmessage = (event)=> {
-                console.log(event.data);
-                if(callback.stdout) {
-                    callback.stdout(event.data);
-                }
-            };
-        };
-        socket.onerror = (err)=> {
-            if(callback.onerr) {
-                callback.onerr(err);
-            }
-            socket = null;
-        };
+        cmd.long_cmd(args, callback);
     },
     async mkdir(dir) {
         let p = {
@@ -128,11 +90,17 @@ const docker = {
         };
         return await api.run_command(p);
     },
-    install() {
+    install(callback = { stdout: null, stderr: null, onerr: null, onend: null }) {
+        cmd.long_cmd({
+            "command": "./scripts/install_docker_debian.sh",
+            args: ["docker"],
+        }, callback);
+
+        /*
         return new Promise(async (resolve, reject)=> {
             let p = {
                 command: {
-                    "command":"./config/install_docker.sh",
+                    "command":"./scripts/install_docker_debian.sh",
                     args:["docker"],
                 },
                 key: 'install_docker',
@@ -149,6 +117,7 @@ const docker = {
             });
             await api.proc_command(p);
         });
+        */
     },
     async check_install() {
         let p = {

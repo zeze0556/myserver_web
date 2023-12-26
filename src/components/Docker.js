@@ -64,28 +64,62 @@ function ContainOp(props) {
 }
 
 function DockerList(props) {
-    const [page, setPage] = useState(0);
-    const [filter, setFilter] = useState('');
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [loading, setLoading] = useState(true);
+    const [state, setState] = useState({
+        page:0,
+        filter:'',
+        rowsPerPage:10,
+        dockerlist:props.data || [],
+        loading:true
+    });
+    let update_state = (v) => {
+        setState((prev) => {
+            return { ...prev, ...v };
+        });
+    };
+
     const handleChangePage = (event, newPage) => {
-        setPage(newPage);
+        update_state({page:newPage});
     };
 
     const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0);
+        update_state({ rowsPerPage: parseInt(event.target.value, 10), page:0});
     };
     const handleFilterChange = (event) => {
-        setFilter(event.target.value);
+        update_state({filter:event.target.value});
     };
     const handleEditClick = (parameter) => {
     };
-    const filteredData = props.data.filter((row) => {
+    const filteredData = state.dockerlist.filter((row) => {
         return Object.values(row).some((value) => {
-            return value.toString().toLowerCase().includes(filter.toLowerCase());
+            return value.toString().toLowerCase().includes(state.filter.toLowerCase());
         });
     });
+    const { global_data, api } = useData();
+    let get_status = async () => {
+        let dockerlist = state.dockerlist;
+        for (let i = 0; i < dockerlist.length; i++) {
+            let ret = await api.run_command({
+                command: "/bin/bash",
+                args: ["-c", `cd /app/docker/${dockerlist[i].name}&&docker compose ps --format json`]
+            });
+            if (ret.ret == 0) {
+                let data = JSON.parse(ret.data.stdout);
+                dockerlist[i]= {...dockerlist[i],
+                                ...data};
+            }
+            update_state({dockerlist:dockerlist});
+        }
+    };
+    useEffect(()=> {
+        update_state({dockerlist: props.data});
+        get_status();
+        let update = setInterval(async () => {
+                get_status();
+            }, 10000);
+        return ()=> {
+            clearInterval(update);
+        };
+    },[]);
     return <><TableContainer component={Paper}>
                <Table>
                  <TableHead>
@@ -95,18 +129,19 @@ function DockerList(props) {
       <TableCell>状态</TableCell>
       <TableCell>端口</TableCell>
       <TableCell>mount</TableCell>
+                    <TableCell>Status</TableCell>
     </TableRow>
                  </TableHead>
                  <TableBody>
     {filteredData
-     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+     .slice(state.page * state.rowsPerPage, state.page * state.rowsPerPage + state.rowsPerPage)
      .map((row) => (
          <TableRow key={row.name}>
            <TableCell>
-             { props.onUp &&
+             { props.onUp && row.State != 'running' &&
                <Button onClick={() => props.onUp(row)}>启动</Button>
              }
-             { props.onDown &&
+             { props.onDown && row.State == 'running' &&
                <Button onClick={() => props.onDown(row)}>停止</Button>
              }
              { props.onConfig &&
@@ -117,14 +152,17 @@ function DockerList(props) {
              {row.name}
            </TableCell>
            <TableCell>
-             {row.status}
+             {row.State}
            </TableCell>
            <TableCell>
-             {row.port}
+             {row.Ports}
            </TableCell>
            <TableCell>
-             {row.mount}
+             {row.Mounts}
            </TableCell>
+             <TableCell>
+                 {row.Status}
+             </TableCell>
          </TableRow>
      ))}
                  </TableBody>
@@ -133,38 +171,134 @@ function DockerList(props) {
         <TablePagination
     component="div"
     count={filteredData.length}
-    page={page}
+    page={state.page}
     onPageChange={handleChangePage}
-    rowsPerPage={rowsPerPage}
+    rowsPerPage={state.rowsPerPage}
     onRowsPerPageChange={handleChangeRowsPerPage}
     style={{ marginTop: '1rem' }}
         />
            </>;
 }
 
+const Install=(props)=> {
+    const terminal = useRef(null);
+    const shell_ref = useRef(null);
+    let [container_up_message, set_container_up_message] = useState("");
+    useEffect(()=> {
+        terminal.current = new Terminal({
+            //rendererType: 'canvas',
+            rows: 40,
+            convertEol: true,
+            scrollback: 10,
+            disableStdin: false,
+            cursorStyle: 'underline',
+            cursorBlink: true
+        });
+        const fitAddon = new FitAddon();
+        terminal.current.loadAddon(fitAddon);
+        terminal.current.onResize((size) => {
+            // 调整 xterm 和 WebSocket 的窗口大小
+            fitAddon.fit();
+        });
+        terminal.current.open(shell_ref.current);
+        if(props.data == null) return;
+        docker[props.data.op]({
+            stdout:(out)=> {
+                if(terminal.current)
+                    terminal.current.write(out);
+                //set_container_up_message(container_up_message+out);
+            },
+            stderr:(err)=> {
+                console.log("up_container stderr=", err);
+            },
+            onerr:(err)=> {
+                console.log("up_container err=", err);
+            },
+            onend:()=> {
+                if(props.onEnd)
+                props.onEnd();
+            }
+        });
+    },[props]);
+    return (<Box ref={shell_ref} width="100vh" height="100vh"/>);
+};
+
 export default function Docker(props) {
-    let [installed, set_installed] = useState(false);
-    let [dockerlist, update_dockerlist] = useState([]);
-    let [open_dialog, set_open_dialog] = useState(false);
-    let [open_container_up_dialog, set_open_container_up_dialog] = useState(false);
-    let [cur_container, set_cur_container] = useState(null);
-    let [data, set_data] = useState({
-        title: "",
-        env:"",
-        config:""
+    let [state, setState] = useState({
+        data: {
+            title: "",
+            env: "",
+            config: "",
+        },
+        dockerlist:[],
+        installed:false,
+        open_dialog:false,
+        open_container_up_dialog:false,
+        cur_container: null,
+        schema: {
+            "type": "object",
+            "title": "新建docker容器",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "title": "容器名称",
+                },
+                "env": {
+                    "type": "string",
+                    "title": "环境变量",
+                    "format": "ini",
+                    "default": "",
+                    "options": {
+                        "ace": {
+                            "theme": "ace/theme/vibrant_ink",
+                            "tabSize": 2,
+                            "useSoftTabs": true,
+                            "wrap": true
+                        }
+                    }
+                },
+                "config": {
+                    "type": "string",
+                    "format": "yaml",
+                    "title": "docker-compose配置",
+                    "default": "",
+                    "options": {
+                        "ace": {
+                            "theme": "ace/theme/vibrant_ink",
+                            "tabSize": 2,
+                            "useSoftTabs": true,
+                            "wrap": true
+                        }
+                    }
+                }
+            },
+            "require": [
+                "title",
+                "env",
+                "config"
+            ]
+        }
     });
     const { global_data, api } = useData();
+    let update_state = (v) => {
+        setState((prev) => {
+            return { ...prev, ...v };
+        });
+    };
+
     let get_docker_config = async()=> {
-        let read_ret = await api.config_file({filename:'config/docker.config', 'op':"get"});
+        let read_ret = await api.config_file({filename:'config/container.config', 'op':"get"});
         if(read_ret.ret == 0 && read_ret.data) {
-            let list = JSON.parse(read_ret.data);
-            update_dockerlist(list);
+            let config = JSON.parse(read_ret.data);
+            console.log("get docker list config====", config);
+            update_state({dockerlist:config||[]});
         }
     };
     let check_install = async ()=> {
         let ret = await docker.check_install();
         if(ret.ret == 0 && ret.data && ret.data.stdout != '') {
-            set_installed(true);
+            //set_installed(true);
+            update_state({install_dialog: false, run_command:{}, installed: true});
             await get_docker_config();
             let list_ret = await docker.list_all();
             if(list_ret.ret == 0 && list_ret.data && list_ret.data.stdout != '') {
@@ -186,39 +320,40 @@ export default function Docker(props) {
                         }
                         jsonData.push(obj);
                     }
-                    update_dockerlist(jsonData);
+                    //update_state({dockerlist:jsonData});
                 }
             }
         }
     };
     let install_docker = async () => {
-        let install_ret = await docker.install();
-        console.log("docker install ret=", install_ret);
-        if(install_ret.ret == 0) {
-            await check_install();
+        let run_command = {};
+        if(!state.installed) {
+            run_command = { op: 'install' };
+        }
+        if (!run_command.op) {
+            update_state({ install_dialog: false });
+        } else {
+            update_state({ install_dialog: true, run_command });
         }
     };
 
     let up_container = async(row)=> {
-        set_cur_container({...row, op:"start_container"});
-        set_open_container_up_dialog(true);
+        update_state({ cur_container: { ...row, op: "start_container"}, open_container_up_dialog:true});
     };
 
     let down_container = async(row)=> {
-        set_cur_container({...row, op:"stop_container"});
-        set_open_container_up_dialog(true);
+        update_state({ cur_container: { ...row, op: "stop_container" }, open_container_up_dialog: true });
     };
     let Running_Docker = ()=> {
-        return <DockerList data={dockerlist} onUp={up_container} onConfig={config_container} onDown={down_container}/>;
+        return <DockerList data={state.dockerlist} onUp={up_container} onConfig={config_container} onDown={down_container}/>;
     };
     let handleCloseDialog = ()=> {
-        set_open_dialog(false);
+        update_state({open_dialog: false});
     };
     let handleSave = async (v)=> {
         let config = jsonEditorFormRef.current.getValue();
-        console.log("config==", config);
         let save = await docker.save_config(config);
-        console.log("save ret=", save);
+        let dockerlist = state.dockerlist;
         if(save.ret == 0) {
             let index = dockerlist.findIndex(v=>v.dir == `${docker.docker_config}/${config.title}`);
             if(index >= 0) {
@@ -230,72 +365,34 @@ export default function Docker(props) {
                                  dir: `${docker.docker_config}/${config.title}`
                                 });
             }
-            let write_ret = await api.config_file({filename:'config/docker.config', 'op':"put", data: JSON.stringify(dockerlist)});
-            update_dockerlist(dockerlist);
-            set_open_dialog(false);
+            let write_ret = await api.config_file({filename:'config/container.config', 'op':"put", data: JSON.stringify(dockerlist)});
+            update_state({dockerlist, open_dialog:false});
         }
     };
-    let [schema, set_schema] = useState({
-        "type": "object",
-        "title": "新建docker容器",
-        "properties": {
-            "title": {
-                "type": "string",
-                "title": "容器名称",
-            },
-            "env": {
-                "type": "string",
-                "title": "环境变量",
-                "format": "ini",
-                "default": "",
-                "options": {
-                    "ace": {
-                        "theme": "ace/theme/vibrant_ink",
-                        "tabSize": 2,
-                        "useSoftTabs": true,
-                        "wrap": true
-                    }
-                }
-            },
-            "config": {
-                "type": "string",
-                "format": "yaml",
-                "title": "docker配置",
-                "default": "",
-                "options": {
-                    "ace": {
-                        "theme": "ace/theme/vibrant_ink",
-                        "tabSize": 2,
-                        "useSoftTabs": true,
-                        "wrap": true
-                    }
-                }
-            }
-        },
-        "require": [
-            "title",
-            "env",
-            "config"
-        ]
-    });
     let add = async()=> {
-        schema.title = "新建";
-        set_schema(schema);
-        set_open_dialog(true);
+        let schema = {...state.schema,
+                      title: "新建"
+                     };
+        update_state({
+            open_dialog: true,
+            schema: schema
+        });
     };
     let config_container = async(row)=> {
-        schema.title = "修改容器";
-        set_schema(schema);
+        let schema = {...state.schema,
+                      title: "修改容器"
+                     };
         let name = row.name;
         let dir = row.dir;
         let ret = await docker.get_config({title:name, dir:dir});
         if(ret.ret  == 0) {
-            set_data({
+            update_state({
+                schema: schema,
                 "title": row.name,
                 "env": ret.env.data,
-                "config":ret.compose.data
+                "config":ret.compose.data,
+                open_dialog: true
             });
-            set_open_dialog(true);
         }
     };
     const jsonEditorFormRef = useRef(null);
@@ -304,10 +401,10 @@ export default function Docker(props) {
     });
     const RenderDialog = () => {
         return (
-            <Dialog open={open_dialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
+            <Dialog open={state.open_dialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
               <DialogTitle>配置</DialogTitle>
               <CustomDialogContent>
-                <JsonEditorForm schema={schema} ref={jsonEditorFormRef} data={data}/>
+                <JsonEditorForm schema={state.schema} ref={jsonEditorFormRef} data={state.data}/>
               </CustomDialogContent>
               <DialogActions>
                 <Button onClick={handleSave}>保存</Button>
@@ -318,7 +415,8 @@ export default function Docker(props) {
     };
 
     let handle_close_container_up =()=> {
-        set_open_container_up_dialog(false);
+        //set_open_container_up_dialog(false);
+        update_state({open_container_up_dialog:false});
     };
     useEffect(()=> {
         check_install();
@@ -326,10 +424,10 @@ export default function Docker(props) {
         };
     },[]);
     let RenderContainerOp = ()=> {
-        return <Dialog open={open_container_up_dialog} onClose={handle_close_container_up} fullWidth maxWidth="md">
+        return <Dialog open={state.open_container_up_dialog} onClose={handle_close_container_up} fullWidth maxWidth="md">
                  <DialogTitle>启动容器</DialogTitle>
                  <CustomDialogContent>
-                   <ContainOp  data={cur_container}/>
+                   <ContainOp  data={state.cur_container}/>
                  </CustomDialogContent>
                  <DialogActions>
                    <Button onClick={handle_close_container_up}>取消</Button>
@@ -339,15 +437,26 @@ export default function Docker(props) {
     };
     return <><CommonWindow title="docker" {...props}>
         <Container>
-            {!installed &&
+            {!state.installed &&
                 <Button onClick={install_docker}>安装docker</Button>
             }
-            {installed &&
+            {state.installed &&
                 <Button onClick={add}>新建容器</Button>
             }
             <Running_Docker />
             <RenderDialog />
             <RenderContainerOp />
+            {state.install_dialog &&
+                <Dialog open={state.install_dialog} onClose={() => console.log("close")}>
+                    <DialogTitle>初始化</DialogTitle>
+                    <CustomDialogContent>
+                        <Install data={state.run_command} onEnd={check_install} />
+                    </CustomDialogContent>
+                    <DialogActions>
+                    </DialogActions>
+
+                </Dialog>
+          }
         </Container>
     </CommonWindow>
     </>;

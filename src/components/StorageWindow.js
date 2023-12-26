@@ -12,6 +12,7 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
+    DialogContentText,
     Toolbar,
     IconButton,
 } from '@mui/material';
@@ -106,6 +107,7 @@ const StorageWindow = (props) => {
             update_state({pools:v});
         };
         let my_set = (v) => {
+            console.log("my_set====", v);
             update_state({disks:v});
         };
         let v = global_data.get('pools', [], async () => {
@@ -267,6 +269,10 @@ const StorageWindow = (props) => {
                             console.log("mount_ret===", mount_ret);
                         }
                         update_state({ openAddDialog: false });
+                    } else {
+                        global_data.set('alerts', [{id:'error',
+                                                    content:<RenderError title="错误" content={format_ret.stderr}/>
+                                                   }]);
                     }
                 }
                     break;
@@ -289,6 +295,25 @@ const StorageWindow = (props) => {
                 <DialogActions>
                     <Button onClick={onSave}>保存</Button>
                     <Button onClick={onClose}>取消</Button>
+                </DialogActions>
+            </Dialog>
+        );
+    };
+    const RenderError = (props) => {
+        let onClose = () => {
+            //update_state({ openAddDialog: !state.openAddDialog });
+            global_data.set('alerts',[]);
+        };
+        return (
+            <Dialog open={true} onClose={onClose} fullWidth maxWidth="md">
+              <DialogTitle>{props.title}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                      {props.content}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onClose}>关闭</Button>
                 </DialogActions>
             </Dialog>
         );
@@ -316,7 +341,7 @@ const StorageWindow = (props) => {
                                 "path": {
                                     "type": "string",
                                     "format": "disk_select",
-                                    "title": "设备"
+                                    "title": "设备",
                                 },
                                 "model": {
                                     "type": "string",

@@ -60,6 +60,7 @@ export const init_data = {
     api_token: '',
     disks:{},
     navigation_enable:false,
+    alerts:[],
     ...WatchData
     //shortlist_notify:()=>{},
     //update:()=>{},
