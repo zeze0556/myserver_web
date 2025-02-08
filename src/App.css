@@ -1,7 +1,6 @@
 .App {
-    text-align: center;
+  text-align: center;
 }
-
 
 .App-logo {
   height: 40vmin;
@@ -36,105 +35,4 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-
-
-.react-resizable {
-    /*display: block;*/
-    position: absolute;
-    /*
-    right: -1px;
-    bottom: -1px;
-    z-index: 101;
-    cursor: nwse-resize;
-    width: 12px;
-    height: 12px
-*/
-}
-/*
-.react-resizable::after {
-    position: absolute;
-    display: block;
-    border-bottom: 12px solid #60a917;
-    border-left: 12px solid transparent;
-    content: "";
-    right: -2px;
-    bottom: -2px
-}
-
-.react-resizable:not(.react-resize-disabled):hover::after {
-    -webkit-animation: resize-element-animation 1s ease infinite;
-    animation: resize-element-animation 1s ease infinite
-}*/
-.react-resizable-handle {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background-repeat: no-repeat;
-  background-origin: content-box;
-  box-sizing: border-box;
-  border-bottom: 12px solid #60a917;
-  border-left: 12px solid transparent;
-  padding: 0;
-}
-.react-resizable-handle-sw {
-  bottom: 0;
-  left: 0;
-  cursor: sw-resize;
-  transform: rotate(90deg);
-}
-.react-resizable-handle-se {
-  bottom: 0;
-  right: 0;
-  margin-right: 3px;
-  margin-bottom: 3px;
-  cursor: se-resize;
-}
-.react-resizable-handle-nw {
-  top: 0;
-  left: 0;
-  cursor: nw-resize;
-  transform: rotate(180deg);
-}
-.react-resizable-handle-ne {
-  top: 0;
-  right: 0;
-  cursor: ne-resize;
-  transform: rotate(270deg);
-}
-.react-resizable-handle-w,
-.react-resizable-handle-e {
-  top: 50%;
-  margin-top: -10px;
-  margin-right: 3px;
-  cursor: ew-resize;
-}
-.react-resizable-handle-w {
-  left: 0;
-  transform: rotate(135deg);
-}
-.react-resizable-handle-e {
-  right: 0;
-  transform: rotate(315deg);
-}
-.react-resizable-handle-n,
-.react-resizable-handle-s {
-  left: 50%;
-  margin-left: -10px;
-  margin-bottom: 3px;
-  cursor: ns-resize;
-}
-.react-resizable-handle-n {
-  top: 0;
-  transform: rotate(225deg);
-}
-.react-resizable-handle-s {
-  bottom: 0;
-  transform: rotate(45deg);
-}
-
-.xterm {
-    width:100%;
-    height:100%;
 }
