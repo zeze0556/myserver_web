@@ -1,53 +1,66 @@
 // TaskBar.js
-import React, { useState,Fragment } from 'react';
-import { Box, Paper, IconButton, Avatar, Drawer,Typography,
-         Popover,
-         List,
-         ListItem,
-         ListItemIcon,
-         ListItemText,
-         AppBar,
-         Toolbar,
-       } from '@mui/material';
-import { DesktopWindows, Settings, Notifications,
-         Maximize,
-         Menu,
-         Minimize,
-         Restore
-       } from '@mui/icons-material';
+import React, {useState, useEffect, useRef, useContext, forwardRef, useImperativeHandle, Fragment } from 'react';
+import parse from 'html-react-parser';
+import { useWindowManager } from '../rix/RixWindowManager';
 
-import { useWindowManager } from './WindowManager';
-
-const TaskBar = (props) => {
-    const [isSidebarOpen, setSidebarOpen] = useState(false);
-    const [startMenuAnchorEl, setStartMenuAnchorEl] = useState(null);
-    const { getApps, activeApp } = useWindowManager();
-    const handleSidebarToggle = () => {
-        setSidebarOpen(!isSidebarOpen);
+const TaskBar = forwardRef((props, ref) => {
+    let [state, setState] = useState({
+        tasks:[],
+        menus:props.menus||[],
+    });
+    let update_state = (v) => {
+        setState((prev) => {
+            return { ...prev, ...v };
+        });
     };
-
-    const handleSidebarClose = () => {
-        setSidebarOpen(false);
+    const { windows, opeWindow, getApps, activeApp } = useWindowManager();
+    useEffect(()=> {
+        let f = windows.watch("wins",(v)=>{
+            let apps = windows.wins;
+            let tasks = [];
+            for(let i in apps) {
+                tasks.push(apps[i]);
+            }
+            update_state({tasks});
+            //setUpdate(update+1);
+        });
+        return ()=> {
+            windows.unwatch("wins", f);
+        };
+    });
+    let task_click= (v)=> {
+        activeApp(v);
     };
-    const handleStartMenuClick = (event) => {
-        setStartMenuAnchorEl(event.currentTarget);
-    };
-
-    const handleStartMenuClose = () => {
-        setStartMenuAnchorEl(null);
-    };
-    let {apps} = props;
-
-    const [isSettingsOpen, setSettingsOpen] = useState(false);
-
-    const handleSettingsToggle = () => {
-        setSettingsOpen(!isSettingsOpen);
-    };
-    let onOpenApp = (app)=> {
-        handleStartMenuClose();
-        if (props.onOpenApp) props.onOpenApp(app);
-    };
-
+    //let {apps} = props;
+    
+    return(<div className="task-bar">
+                <div className="task-bar-section">
+                <button className="task-bar-item" id="start-menu-toggle"><span className="mif-windows"></span></button>
+                <div className="start-menu" data-role="dropdown" data-toggle-element="#start-menu-toggle">
+                <div className="start-menu-inner">
+                <div className="explorer">
+                <ul className="v-menu w-100 bg-brandColor2 fg-white">
+                {state.menus}
+            </ul>
+                </div>
+                </div>
+                </div>
+                </div>
+                <div className="task-bar-section tasks">{state.tasks.map((v)=>{
+                    return (<span className="task-bar-item started" key={v.id} onClick={(e)=>task_click(v.id, e)}>
+                            {v.icon}
+                            </span>);
+                })}
+                </div>
+                  <div className="task-bar-section system-tray ml-auto">
+                    <button className="task-bar-item" onClick={props.charms_toggle}><span className="mif-comment"></span></button>
+                    <span style={{lineHeight: "40px"}} className="pr-4">
+                      <span data-role="clock" className="w-auto fg-white reduce-1" data-show-date="false"></span>
+                    </span>
+                  </div>
+                </div>
+        );
+/*
     return (
         <Box
             display="flex"
@@ -61,7 +74,6 @@ const TaskBar = (props) => {
             color="white"
         zIndex={3}
         >
-            {/* 窗口图标 */}
           <IconButton color="inherit" onClick={handleStartMenuClick} sx={{width:60, height:60}}>
                 <DesktopWindows />
             </IconButton>
@@ -96,7 +108,6 @@ const TaskBar = (props) => {
                     )}
                 </List>
             </Popover>
-            {/* 应用图标*/}
           <Paper sx={{ p: 1, cursor: 'pointer',
                        width: '100%',
                        position: 'relative',
@@ -112,19 +123,15 @@ const TaskBar = (props) => {
                   })}
             </Paper>
 
-            {/* 状态图标（示例中只有一个通知图标） */}
           <IconButton color="inherit" onClick={handleSidebarToggle} sx={{right:0, positon:'absolute'}}>
                 <Notifications />
             </IconButton>
-            {/* 侧边栏 */}
             <Drawer anchor="right" open={isSidebarOpen} onClose={handleSidebarClose} sx={{ position: 'fixed', top: 0, height: 'calc(100vh - 48px)', zIndex:2 }}>
-                {/* 侧边栏内容，根据实际需求进行扩展 */}
                 <Box sx={{ width: '250px', padding: '16px', height: '100%' }}>
                     <Typography>这是侧边栏内容</Typography>
                 </Box>
             </Drawer>
 
-{/* 应用窗口 */}
       <Drawer
         anchor="top"
         open={isSettingsOpen}
@@ -157,13 +164,12 @@ const TaskBar = (props) => {
             </IconButton>
           </Toolbar>
         </AppBar>
-        {/* 窗口内容 */}
         <Box p={2}>
-          {/* ... 窗口内容 */}
         </Box>
       </Drawer>
         </Box>
     );
-};
+*/
+});
 
 export default TaskBar;

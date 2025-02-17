@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useRef, useContext, forwardRef, useImperativeHandle, Fragment } from 'react';
 import ReactDOM from 'react-dom/client';
-import { useData,rix_make_watch_data } from "../store/global_data.js";
+import { DataProvider, useData,rix_make_watch_data, DataContext } from "../store/global_data.js";
+import RixSelect from "../rix/RixSelect";
 import {Autocomplete, TextField} from '@mui/material';
 
 let JSONEditor = window.JSONEditor;
@@ -44,11 +45,34 @@ class Disk_Select extends JSONEditor.AbstractEditor{
             }
         };
         this.used_disks.watch('cur_path', this.set_model);
-        const {global_data} = this.defaults;//useData();
+        //const {global_data} = this.defaults;//useData();
+        console.log("this.defaults===", this.defaults);
         let MyRender = ()=> {
+            //console.log("global_===", useData());
+            const {global_data} = useContext(DataContext);
             const [options, setOptions] = useState([]);
             const [value, setValue] = useState('');
-            if(!disks) disks = global_data.get('blockdevices');
+            if(!disks) {
+                let list = global_data.get('blockdevices');
+                console.log("disks===", list);
+                let canuse = [];
+                for (let disk of list) {
+                    if(!disk.children) {
+                        //无分区
+                        if(disk.mountpoint) {
+                            //已挂载
+                            continue;
+                        }
+                        canuse.push(disk);
+                    }
+                    if(disk.children&&disk.children.length >= 1) {
+                        let nouse = disk.children.filter(v=>v.mountpoint == null);
+                        if(nouse.length == 0) continue;
+                        canuse.push(disk);
+                    }
+                }
+                disks = canuse;
+            }
             this.disks = disks;
             useEffect(() => {
                 let set_options = (v2)=> {
@@ -56,7 +80,13 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                     list_options = list_options.filter(v=> {
                         return v2.filter(name=>name==v).length == 0;
                     });
-                    setOptions(list_options);
+                    let options = list_options.map(disk=>{
+                        return {
+                            title:`${disk.model}(${disk.size}) at ${disk.path}`,
+                            value: `${disk.path}`
+                        };
+                    });
+                    setOptions(options);
                 };
                 this.used_disks.watch('used', set_options);
                 let set_v = (v2)=> {
@@ -71,25 +101,49 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                     //this.used_disks.unwatch('cur_path', set_v);
                 };
             },[]);
-            return <Autocomplete
-                     freeSolo
-                     value={value}
-                     onChange={onChange}
-                     options={options}
-                     getOptionLabel={(option) => {
-                         let disk = disks.filter(v=>v.path == option)[0];
-                         if(disk) {
-                             let v = `${disk.model}(${disk.size}) at ${disk.path}`;
-                             return v;
-                         }
-                         return "";
-                     }}
-                     renderInput={(params) => {
-                                               return <TextField {...params} label="选择磁盘" />;
-                                              }}
-                   />;
+            let Options = ()=> {
+                let ret = [];
+                console.log("disks===", disks);
+                for(let disk of disks) {
+                    if(disk.children&&disk.children.length > 0) {
+                        let children = [];
+                        console.log("disk =", disk, children);
+                        let uuid = disk.uuid || disk.path;
+                        let c_check = true;
+                        if(disk.children&&disk.children.length>=1) {
+                            let use = disk.children.filter(v=>v.mountpoint != null);
+                            if(use.length >0 ) {
+                                c_check = false;
+                            }
+                        }
+                        if(c_check) {
+                            children.push(<option value={disk.path} key={disk.path}>{disk.path}(整个磁盘)</option>);
+                        }
+                        disk.children.forEach(v=> {
+                            if(v.mountpoint == null) {
+                                children.push(<option value={v.path} key={v.uuid}>{v.path}(分区)</option>);
+                            }
+                        });
+                        let title = `${disk.model}(${disk.size}) at ${disk.path}`;
+                        ret.push(<optgroup key={disk.uuid} label={title}>
+                                 {children}
+                                 </optgroup>);
+                    } else {
+                        console.log("disk =", disk);
+                        let title = `${disk.model}(${disk.size}) at ${disk.path}`;
+                        let uuid = disk.uuid || disk.path;
+                        ret.push(<optgroup label={title} key={uuid}>
+                                 <option value={disk.path}>{disk.path}(整个磁盘)</option>
+                                 </optgroup>);
+                    }
+                }
+                return ret;
+            };
+            return (<RixSelect onChange={onChange} value={value}>
+                    <Options />
+                    </RixSelect>);
         };
-        this.view_root.render(<MyRender/>);
+        this.view_root.render(<DataProvider><MyRender/></DataProvider>);
     }
     setValue(v, init, fromTemplate) {
         this.value = v;
@@ -213,7 +267,7 @@ const JsonEditorForm = forwardRef((props, ref) => {
     const { schema, callbacks} = props;
     const editorRef = useRef(null);
     const containerRef = useRef(null);
-    const {global_data} = useData();
+    const {global_data} = useContext(DataContext);
     let [update, setUpdate] = useState(0);
     JSONEditor.defaults.editors.disk_select= Disk_Select;
     JSONEditor.defaults.global_data = global_data;
@@ -227,17 +281,6 @@ const JsonEditorForm = forwardRef((props, ref) => {
             return 'pool_select';
         }
     });
-    /*
-    if(editorRef.current&&props.data) {
-        console.log("set======", props.data);
-        //editorRef.current.setValue(props.data);
-        setTimeout(() => {
-            console.log("json props====", JSON.stringify(props.data));
-            editorRef.current.setValue(props.data);
-            //setUpdate(update + 1);
-        });
-
-    }*/
     useEffect(() => {
         //if(editorRef.current) return;
         let options = {
@@ -246,6 +289,7 @@ const JsonEditorForm = forwardRef((props, ref) => {
             //iconlib: 'fontawesome4',
             ...props.options,
             ajax: true,
+            expand_height: true,
             //disable_collapse: true,
             //disable_edit_json: true,
             //disable_properties: true,
@@ -284,8 +328,6 @@ const JsonEditorForm = forwardRef((props, ref) => {
         setValue,
     }));
 
-    return (
-        <div ref={containerRef} {...props} key={update}/>
-    );
+    return (<div ref={containerRef} {...props} key={update}></div>);
 });
 export default JsonEditorForm;

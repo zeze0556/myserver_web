@@ -59,8 +59,18 @@ export const init_data = {
     user:{},
     api_token: '',
     disks:{},
+    used_device:[],
     navigation_enable:false,
     alerts:[],
+    //pools:[],
+    shortlist:[
+    ],
+    options: {
+        windowArea: ".window-area",
+        windowAreaClass: "",
+        taskBar: ".task-bar > .tasks",
+        taskBarClass: "",
+    },
     ...WatchData
     //shortlist_notify:()=>{},
     //update:()=>{},
@@ -78,18 +88,23 @@ export function useData() {
     return useContext(DataContext);
 };
 
+const contextValue = {
+    ...init_data,
+    //update: useCallback(() => setUpdate(update+1), []),
+};
+Api.Init(contextValue);
+
+//contextValue.watch('pools', ()=> {
+//    console.log("pools upgrate==", contextValue.pools);
+//});
+
+export const context_value = {global_data:contextValue, make_watch_data:rix_make_watch_data, api: Api};
 
 export const DataProvider = ({ children }) => {
     //const [update, setUpdate] = useState(0);
 
-    const contextValue = {
-        ...init_data,
-        //update: useCallback(() => setUpdate(update+1), []),
-    };
-    Api.Init(contextValue);
-
     return (
-        <DataContext.Provider value={{global_data:contextValue, make_watch_data:rix_make_watch_data, api: Api}}>
+        <DataContext.Provider value={context_value}>
             {children}
         </DataContext.Provider>
     );

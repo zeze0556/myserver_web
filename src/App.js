@@ -1,5 +1,5 @@
 import { useState, useEffect} from 'react';
-import { WindowManagerProvider } from './components/WindowManager';
+import { RixWindowManagerProvider } from './rix/RixWindowManager';
 import "./App.css";
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Desktop from './components/Desktop';
@@ -29,9 +29,9 @@ function App() {
             };
         },[]);
         if(state.login) {
-            return (<WindowManagerProvider>
+            return (<RixWindowManagerProvider>
                       <Desktop />
-                    </WindowManagerProvider>);
+                    </RixWindowManagerProvider>);
         } else {
             return (<Login/>);
         }

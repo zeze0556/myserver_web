@@ -1,54 +1,160 @@
+import React, {forwardRef,useState, useEffect, useRef, useContext } from 'react';
 import { js2xml, xml2js } from 'xml-js';
-import api from '../api';
+import {context_value} from "../store/global_data";
 import cmd from "./command.js";
+import Disks from "./disks";
+import {WindowApi, useWindowManager} from "../rix/RixWindowManager";
+import RixButton from "../rix/RixButton";
+import RixDialog from "../rix/RixDialog";
+import JsonEditorForm from '../components/JsonEditorForm';
+import { Terminal } from 'xterm';
+import 'xterm/css/xterm.css';
+import 'xterm/lib/xterm.js';
+import { FitAddon } from 'xterm-addon-fit';
+import { AttachAddon } from 'xterm-addon-attach';
 
-
+const {global_data, api, make_watch_data} = context_value;
 const qemu = {
     command: "qemu-system",
     arch: "x86_64",
     async check_virt_manager() {
         let p = {
-            command: "./scripts/install_virt_manager.sh",
+            command: "/app/scripts/install_virt_manager.sh",
             args: ["check"]
         };
-        return await api.run_command(p);
+        let res = await api.run_command(p);
+        if(res.ret == 0) {
+            if (res.data.stdout.includes("not installed")) {
+                global_data.set('vm_service', 'not_installed');
+            } else if (res.data.stdout.includes("not run")) {
+                global_data.set('vm_service', 'stop');
+            } else {
+                global_data.set('vm_service', 'run');
+            }
+        }
     },
     install_virt_manager(callback={stdout:null, stderr:null, onerr:null, onend:null}) {
         cmd.long_cmd({
-            "command": "./scripts/install_virt_manager.sh",
+            "command": "/app/scripts/install_virt_manager.sh",
             args: ["install_virt_manager"],
         }, callback);
     },
     run_virt_manager(callback = { stdout: null, stderr: null, onerr: null, onend: null }) {
         cmd.long_cmd({
-            "command": "./scripts/install_virt_manager.sh",
+            "command": "/app/scripts/install_virt_manager.sh",
             args: ["run_virt_manager"],
         }, callback);
     },
     async check_x11_bridge() {
         let p = {
-            command: "./scripts/install_x11_bridge.sh",
+            command: "/app/scripts/install_x11_bridge.sh",
             args: ["check"]
         };
         return await api.run_command(p);
     },
     install_x11_bridge(callback = { stdout: null, stderr: null, onerr: null, onend: null }) {
         cmd.long_cmd({
-            "command": "./scripts/install_x11_bridge.sh",
+            "command": "/app/scripts/install_x11_bridge.sh",
             args: ["install_x11_bridge"],
         }, callback);
     },
     run_x11_bridge(callback = { stdout: null, stderr: null, onerr: null, onend: null }) {
         cmd.long_cmd({
-            "command": "./scripts/install_x11_bridge.sh",
+            "command": "/app/scripts/install_x11_bridge.sh",
             args: ["run_x11_bridge"],
         }, callback);
     },
     install(callback={stdout:null, stderr:null, onerr:null, onend:null}) {
         cmd.long_cmd({
-            "command": "./scripts/install_qemu.sh",
+            "command": "/app/scripts/install_qemu.sh",
             args: ["qemu"],
         }, callback);
+    },
+    StartVM_Manager(props) {
+        let Cmd = () => {
+            const terminal = useRef(null);
+            const shell_ref = useRef(null);
+            useEffect(() => {
+                terminal.current = new Terminal({
+                    //rendererType: 'canvas',
+                    rows: 40,
+                    convertEol: true,
+                    scrollback: 10,
+                    disableStdin: false,
+                    cursorStyle: 'underline',
+                    cursorBlink: true
+                });
+                const fitAddon = new FitAddon();
+                terminal.current.loadAddon(fitAddon);
+                terminal.current.onResize((size) => {
+                    // 调整 xterm 和 WebSocket 的窗口大小
+                    fitAddon.fit();
+                });
+                terminal.current.open(shell_ref.current);
+                qemu.run_virt_manager({
+                    stdout: (out) => {
+                        if (terminal.current)
+                            terminal.current.write(out);
+                        //set_container_up_message(container_up_message+out);
+                    },
+                    onend:()=> {
+                        qemu.check_virt_manager();
+                    }
+                });
+            });
+            return <div ref={shell_ref} width="100%" height="100%" />;
+        };
+        return (
+                <RixDialog id={props.id} fullWidth maxWidth="md">
+                <div type="title">启动vm管理器</div>
+                <div type="content" width="100%" height="100%">
+                <Cmd />
+                </div>
+                </RixDialog>
+        );
+    },
+    InstallVM_Manager(props) {
+        let Cmd = () => {
+            const terminal = useRef(null);
+            const shell_ref = useRef(null);
+            useEffect(() => {
+                terminal.current = new Terminal({
+                    //rendererType: 'canvas',
+                    rows: 40,
+                    convertEol: true,
+                    scrollback: 10,
+                    disableStdin: false,
+                    cursorStyle: 'underline',
+                    cursorBlink: true
+                });
+                const fitAddon = new FitAddon();
+                terminal.current.loadAddon(fitAddon);
+                terminal.current.onResize((size) => {
+                    // 调整 xterm 和 WebSocket 的窗口大小
+                    fitAddon.fit();
+                });
+                terminal.current.open(shell_ref.current);
+                qemu.install_virt_manager({
+                    stdout: (out) => {
+                        if (terminal.current)
+                            terminal.current.write(out);
+                        //set_container_up_message(container_up_message+out);
+                    },
+                    onend:()=> {
+                        qemu.check_virt_manager();
+                    }
+                });
+            });
+            return <div ref={shell_ref} width="100%" height="100%" />;
+        };
+        return (
+                <RixDialog id={props.id} fullWidth maxWidth="md">
+                <div type="title">安装vm管理器</div>
+                <div type="content" width="100%" height="100%">
+                <Cmd />
+                </div>
+                </RixDialog>
+        );
     },
     template: {
     },
@@ -712,6 +818,43 @@ const qemu = {
         };
         let ret = js2xml(common, { compact: true, ignoreComment: true, spaces: 4 });
         console.log("ret==", ret);
+    },
+    async update_kvm_conf(list) {
+        await Disks.rm(`/app/token/kvm.conf`);
+        let data = list.map(v=> {
+            console.log("vnc==", v.vnc);
+            let vnc = v.vnc.split(':')[1];
+            return `${v.name}: 127.0.0.1:${5900+parseInt(vnc)}`;
+        }).join('\n');
+        await api.config_file({
+            op: 'put',
+            filename: `/app/token/kvm.conf`,
+            data: data
+        });
+    },
+    async list_running_vm() {
+        let res = await api.run_command({
+            "command": "virsh",
+            "args": ['list', '--name', '--state-running']
+        });
+        if(res.ret == 0) {
+            let vms = res.data.stdout.split('\n').filter(v=>v&&v.trim()!='');
+            let vm_list = [];
+            for(let vm of vms) {
+                let res = await api.run_command({
+                    "command": "virsh",
+                    "args": ['vncdisplay', vm]
+                });
+                if(res.ret == 0) {
+                    let vnc = res.data.stdout.trim();
+                    vm_list.push({name: vm,
+                                  vnc: vnc
+                                 });
+                }
+            }
+            await qemu.update_kvm_conf(vm_list);
+            global_data.set("vm_list", vm_list);
+        }
     }
 
 };

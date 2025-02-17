@@ -6,6 +6,7 @@ const cmd = {
         "command": "/bin/bash",
         "args": ["-c", `cd ${config.dir} && docker compose up -d`]
     };*/
+        console.log("long_cmd==", command);
     let args_s = encodeURIComponent(JSON.stringify(args));
     let socket = new WebSocket((location.protocol == "http:" ? "ws://" : "wss://") + location.host + "/api/ws/shell?args=" + args_s);
     socket.onopen = () => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense,forwardRef } from 'react';
 
 const RixDynamicComponent = forwardRef(({path, rix_type, ...props}, ref) => {
+    console.log("RixDynamicComponent rix_type==", rix_type, path);
     switch(rix_type) {
     case 'component': {
         let Component = lazy(()=> import(`@/${path}`));

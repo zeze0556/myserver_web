@@ -1,0 +1,5 @@
+.charm {
+    height: calc(100vh - 40px);
+    width: 396px;
+    background-color: #1F4F5D;
+}

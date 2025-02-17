@@ -6,39 +6,55 @@ import React, { useState, useEffect, useRef,useContext } from 'react';
 //import {io} from 'socket.io-client';
 
 let socket = null;
-
+function removeAnsiEscapeSequences(input) {
+    const ansiEscape = /\x1b\[[0-9;]*[a-zA-Z]/g;
+    return input.replace(ansiEscape, '');
+}
 const api = {
     Init: function(init_data) {
         this.global_data = init_data;//useContext(DataContext);
         if(socket) return;
         let location = window.location;
-        socket = new WebSocket((location.protocol=="http:"?"ws://":"wss://")+location.host+"/api/ws/sys_stat");
+        let args = {
+            "command": "iostat",
+            "args": ["-k", "1", "-h"]
+        };
+        let args_s = encodeURIComponent(JSON.stringify(args));
+        socket = new WebSocket((location.protocol=="http:"?"ws://":"wss://")+location.host+"/api/ws/shell?args="+args_s);
         socket.onopen = ()=> {
             console.log("connected!!!!");
         };
-        socket.onmessage = (evt)=> {
-            let {data} = evt;
-            if(data) {
-                try {
-                    let data_j = JSON.parse(data);
-                    switch(data_j.type) {
-                    case 'command': {
-                        console.log("command==", data_j);
-                    }
-                        break;
-                    default: {
-                        for(let i in data_j) {
-                            this.global_data.set(i, data_j[i]);
-                        }
-                    }
-                        break;
-                    }
-                } catch {
-                    //console.log("data==", data);
-                    let pd = data.split('\n');
+        let buffer = "";
+        let line = [];
+        let flag = 0;
+        socket.onmessage = (event)=> {
+            if (event.data instanceof Blob) {
+                let reader = new FileReader();
+                reader.onload = () => {
+                    buffer += removeAnsiEscapeSequences(reader.result);
+                };
+                reader.readAsText(event.data);
+            } else {
+                let j_data = JSON.parse(event.data);
+                if(j_data.op == 'out') {
+                    buffer += removeAnsiEscapeSequences(j_data.stdout);
+                }
+            }
+            let last = buffer.lastIndexOf('\r\n\r\n\r\n');
+            if(last > 0) {
+                line = line.concat(buffer.substring(0, last).split('\r\n\r\n\r\n'));
+                buffer = buffer.substring(last+6);
+                if(!buffer) buffer = "";
+            }
+            let index = 0;
+            while(line.length > 0) {
+                    let data = line.shift();
+                    if(!data) break;
+                    if(!data.startsWith('avg-cpu')) break;
+                    let pd = data.split('\r\n');
                     let cpu = [pd[0], pd[1]];
                     let blocks = [];
-                    for(let i = 3; i < pd.length -3; i++) {
+                    for(let i = 3; i < pd.length; i++) {
                         blocks.push(pd[i]);
                     }
                     if(blocks.length > 1) {
@@ -58,8 +74,8 @@ const api = {
                         this.global_data.set('sysstat', jsonData);
                     }
 
-                }
             }
+            line = [];
         };
         socket.onclose= (ev)=> {
             console.log("close====");
@@ -75,6 +91,7 @@ const api = {
         }
     },
     async run_command(req) {
+        //console.log("req===", req);
         const response = await axios.post('/api/command/run', req);
         let {data} = response;
         if(data&&data.ret == 0) {
@@ -85,21 +102,37 @@ const api = {
         return data;
     },
     async disk_info(filter){
-        const response = await axios.post('/api/disk/info', {
-            op: 'post',
-            data: filter,
-        });
-        let {data} = response;
-        if(data&&data.ret == 0) {
-            this.global_data.set('blockdevices', data.disk.blockdevices);
+        let req = {
+            'command': 'lsblk',
+            'args':['--json', '-O']
+        };
+        const res = await axios.post('/api/command/run', req);
+        let {data} = res;
+        if(data.ret == 0) {
+            let stdout = JSON.parse(data.data.stdout);
+            this.global_data.set('blockdevices', stdout.blockdevices);
         }
         return data;
+    },
+    async download_file(data) {
+        return axios({
+            method: 'POST',
+            url: `/api/file/get`,
+            data: data,
+            responseType: 'blob', // 指定响应类型为 blob
+            headers: {
+                'Accept': 'application/octet-stream'
+            }
+        });
+
     },
     async config_file(data) {
         switch(data.op) {
         case 'get': {
             const response = await axios.post(`/api/file/get`, {
-                filename: `${data.filename}`
+                filename: `${data.filename}`,
+            },{
+                'Accept': 'application/json'
             });
             return response.data;
         }
