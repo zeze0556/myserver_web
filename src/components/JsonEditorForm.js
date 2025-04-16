@@ -46,7 +46,7 @@ class Disk_Select extends JSONEditor.AbstractEditor{
         };
         this.used_disks.watch('cur_path', this.set_model);
         //const {global_data} = this.defaults;//useData();
-        console.log("this.defaults===", this.defaults);
+        //console.log("this.defaults===", this.defaults);
         let MyRender = ()=> {
             //console.log("global_===", useData());
             const {global_data} = useContext(DataContext);
@@ -66,7 +66,19 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                         canuse.push(disk);
                     }
                     if(disk.children&&disk.children.length >= 1) {
-                        let nouse = disk.children.filter(v=>v.mountpoint == null);
+                        let nouse = disk.children.filter(v=>{
+                            if(v.children&&v.children.length >=1 ) { //加密且已打开
+                                for(let one of v.children) {
+                                    if(one.type == 'crypt' && one.mountpoint == null) {
+                                        return true;
+                                    }
+                                }
+                            } else {
+                                if(v.mountpoint == null)
+                                    return true;
+                            }
+                            return false;
+                        });
                         if(nouse.length == 0) continue;
                         canuse.push(disk);
                     }
@@ -103,7 +115,14 @@ class Disk_Select extends JSONEditor.AbstractEditor{
             },[]);
             let Options = ()=> {
                 let ret = [];
-                console.log("disks===", disks);
+                //console.log("disks===", disks);
+                let RenderChilder = (v)=> {
+                    let type = v.fstype;
+                    if(!v.fstype) {
+                        type = v.type;
+                    }
+                    return <option value={v.path} key={v.path}>{v.path}[{type}](分区)</option>;
+                };
                 for(let disk of disks) {
                     if(disk.children&&disk.children.length > 0) {
                         let children = [];
@@ -120,8 +139,15 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                             children.push(<option value={disk.path} key={disk.path}>{disk.path}(整个磁盘)</option>);
                         }
                         disk.children.forEach(v=> {
-                            if(v.mountpoint == null) {
-                                children.push(<option value={v.path} key={v.uuid}>{v.path}(分区)</option>);
+                            if(v.mountpoint == null && !v.children) {
+                                children.push(RenderChilder(v));
+                            }
+                            if(v.children&&v.children.length > 0) {
+                                v.children.forEach(v2=> {
+                                    if(v2.mountpoint == null) {
+                                        children.push(RenderChilder(v2));
+                                    }
+                                });
                             }
                         });
                         let title = `${disk.model}(${disk.size}) at ${disk.path}`;
@@ -129,7 +155,7 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                                  {children}
                                  </optgroup>);
                     } else {
-                        console.log("disk =", disk);
+                        //console.log("disk =", disk);
                         let title = `${disk.model}(${disk.size}) at ${disk.path}`;
                         let uuid = disk.uuid || disk.path;
                         ret.push(<optgroup label={title} key={uuid}>

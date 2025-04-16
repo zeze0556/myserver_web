@@ -57,7 +57,7 @@ export default function RixPanel(props) {
             //panel.remove();
             //data.remove();
         };
-    });
+    },[]);
 
     return (<div {...props}><div ref={myref}>
             {children}

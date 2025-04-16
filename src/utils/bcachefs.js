@@ -97,24 +97,40 @@ const bcachefs = {
             };
         }
     },
-    format(config) {
+    async format(config) {
         let args = [];
         args.push("format");
         args.push("-f");
+        if(config['compression']) {
         args.push(`--compression=${config['compression']}`);
+        }
+        if(config['uuid']) {
+            args.push(`--uuid=${config['uuid']}`);
+        }
         if(config["encrypted"]) args.push("--encrypted");
         args.push(`--foreground_target=${config['foreground_target']}`);
         args.push(`--promote_target=${config['promote_target']}`);
         args.push(`--background_target=${config['background_target']}`);
         args.push(`--replicas=${config['replicas']}`);
-        for(let disk of config['label']) {
-            args.push(`--label=${disk.name}`);
+        for(let disk of config['devices']) {
+            if(disk.discard) {
+                continue;
+            }
+            args.push(`--label=${disk.label}`);
             args.push(`${disk.path}`);
         }
-        return {
+        for(let disk of config['devices']) {
+            if(!disk.discard) {
+                continue;
+            }
+            args.push(`--discard`);
+            args.push(`--label=${disk.label}`);
+            args.push(`${disk.path}`);
+        }
+        return await api.run_command({
             command: this.command,
             args
-        };
+        });
     },
     list(config) {
         let args = [];
@@ -162,7 +178,7 @@ const bcachefs = {
                                         });
         return ret;
     },
-    "parse":(input)=> {
+    "parse":(input, mount_path)=> {
         console.log("bcachefs res=", input);
         const uuidMatch = input.match(/Filesystem:\s*([a-f0-9-]+)/i);
         const uuid = uuidMatch ? uuidMatch[1] : null;
@@ -187,23 +203,36 @@ const bcachefs = {
         }
         // Extract device information
         //const deviceRegex = /(\w+\.\w+)\s+\(device\s+(\d+)\):\s+(\w+)\s+(rw|ro)/g;
-        const deviceRegex = /([\w.-]+(?:_[\w.-]+)*)\s*\(device\s+(\d+)\):\s*(\w+)\s+(rw|ro)/g;
+        const deviceRegex = /([\w.-]+(?:_[\w.-]+)*)\s*\(device\s+(\d+)\):\s*([\w-]+)\s+(rw|ro)/g;
         let devices = [];
         let match;
         while ((match = deviceRegex.exec(input)) !== null) {
             const deviceInfo = extractDeviceInfo(input, match.index);
+            let deviceName = match[3];
+            let path = `/dev/${match[3]}`;
+            if(deviceName.startsWith('dm-')) {
+                let find = null;
+                let f = global_data.blockdevices.filter(v=> {
+                    return Disks.match_dm_dev(v, deviceName, (dev)=> {
+                        dev.mountpoint = mount_path;
+                        find = dev;
+                    });
+                })[0];
+                if(f&&find) {
+                    path = find.path;
+                }
+            }
             devices.push({
                 label: match[1],
                 deviceId: match[2],
                 devid: match[2],
-                deviceName: match[3],
-                path: `/dev/${match[3]}`,
+                deviceName: deviceName,
+                path: path,
                 mode: match[4],
                 size: deviceInfo?.capacity??`unknown`,
                 ...deviceInfo
             });
         }
-        console.log("devices==", JSON.stringify(devices));
         return {
             uuid: uuid,
             size: size,
@@ -215,7 +244,7 @@ const bcachefs = {
     async info(path) {
         let ret = await api.run_command({command: "bcachefs", args: ['fs', 'usage', "-h", path]});
         if(ret.ret == 0) {
-            let info = bcachefs.parse(ret.data.stdout);
+            let info = bcachefs.parse(ret.data.stdout, path);
             console.log("info.devices===", info.devices, path);
             Disks.update_blockdevice(info.devices, path);
             return info;
@@ -250,7 +279,8 @@ const bcachefs = {
                 }
                 self_data.set("devices", res.devices);
             } else {
-                self_data.set("devices", null);
+                //console.log("update_info====", self_data, res);
+                self_data.set("status", 'ready');
             }
         });
     },
@@ -282,6 +312,159 @@ const bcachefs = {
         }
         // <div type="title"><Title/></div>
             return <RixDialog id={props.id}>
+            <div type="content">
+            <JsonEditorForm schema={schema} ref={jsonEditorFormRef} data={config}/>
+            </div>
+            <button type="action" className="button primary" onClick={save}>保存</button>
+            <button type="action" className="button js-dialog-close" onClick={close}>取消</button>
+            </RixDialog>;
+    },
+    InitPool(props) {
+        let {windows, getApps, openWindow, set_window_ref, openDialog, closeDialog}= useWindowManager();
+        let jsonEditorFormRef = useRef(null);
+        let data = props.data;
+        let config = {
+        };
+        let save = async ()=> {
+            let data = jsonEditorFormRef.current.getValue();
+            let list = global_data.get('blockdevices');
+            let match_dev= (v, path)=> {
+                if(v.path == path) return true;
+                if(v.children && v.children.length > 0) {
+                    let f = v.children.filter(v2=> {
+                        if(v2.path == path) return true;
+                        return match_dev(v2, path);
+                    })[0];
+                    if(f) return true;
+                }
+                return false;
+            };
+            let check_discard = (path)=> {
+                for(let one of list) {
+                    let check = match_dev(one, path);
+                    if(check) {
+                        if(parseInt(one['disc-gran'])>0
+                           && parseInt(one['disc-max']) > 0) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+            for (let dev of data.devices) {
+                if(check_discard(dev.path)) {
+                    dev.discard = true;
+                } else {
+                    dev.discard = false;
+                }
+            }
+            let ret = await bcachefs.format({
+                ...data,
+                uuid: props.data.uuid
+            });
+            console.log("format ret==", ret);
+            if(ret&&ret.ret == 0) {
+                let ret = await props.onSave(data);
+                if(ret){
+                    closeDialog(props.id);
+                }
+            }
+            /*
+            let ret = await props.onSave(data);
+            console.log("save ret====", ret);
+            if(ret) {
+                closeDialog(props.id);
+            }*/
+        };
+        let close = ()=> {
+        };
+        let schema = {
+            //...Config_Schema,
+            "definitions": {
+                "bcachefs_device": {
+                    "type": "object",
+                    "title": "选择设备",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "format": "disk_select",
+                        },
+                        "label": {
+                            "type": "string",
+                            "title": "标签",
+                            "default": ""
+                        },
+                        "fs_size": {
+                            "type": "string",
+                            "title": "fs_size",
+                            "default": ""
+                        },
+                        "discard": {
+                            "type": "boolean",
+                            "title": "discard",
+                            "default": false
+                        },
+                        "bucket": {
+                            "type": "string",
+                            "title": "bucket",
+                            "default": ""
+                        }
+                    },
+                    "required": [
+                        "path",
+                        "label",
+                        "fs_size",
+                        "discard",
+                        "bucket"
+                    ]
+                },
+                "bcachefs_init_pool": {
+                    "type": "object",
+                    "properties": {
+                        "replicas": {
+                            "type": "number",
+                            "title": "副本数量",
+                            "default": 2
+                        },
+                        "foreground_target": {
+                            "type": "string",
+                            "title": "foreground_target",
+                            "default": "ssd"
+                        },
+                        "promote_target": {
+                            "type": "string",
+                            "title": "promote_target",
+                            "default": "ssd"
+                        },
+                        "background_target": {
+                            "type": "string",
+                            "title": "background_target",
+                            "default": "hdd"
+                        },
+                        "devices": {
+                            "type": "array",
+                            "title": "设备",
+                            //"format": "table",
+                            "items": {
+                                "$ref": `#/definitions/bcachefs_device`
+                            }
+                        }
+
+                    },
+                    "required": [
+                        "replicas",
+                        "foreground_target",
+                        "promote_target",
+                        "background_target",
+                        "devices"
+                    ]
+                }
+            },
+            "$ref": `#/definitions/bcachefs_init_pool`
+        };
+        let title = `初始化池`;
+        // <div type="title"><Title/></div>
+        return <RixDialog id={props.id}>
             <div type="content">
             <JsonEditorForm schema={schema} ref={jsonEditorFormRef} data={config}/>
             </div>
@@ -329,28 +512,27 @@ const bcachefs = {
                     }
                 }
             });
-        });
+        },[]);
         let Title = ()=> {
             let [state, update] = useState(0);
             useEffect(()=> {
                 let w= self_data.watch('name', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 let d= self_data.watch('devices', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 return ()=> {
                     self_data.unwatch('name', w);
                     self_data.unwatch('devices', d);
                 };
-            });
+            },[]);
             let str = '';
             if(self_data.name) {
                 str = `${self_data.name} 挂载位置:${self_data.mount_path} ${self_data.used}/${self_data.size}`;
             } else {
                 str = `挂载位置:${self_data.mount_path} 分区类型:${self_data.type} `;
             }
-            console.log("bcachefs self_data====", self_data);
             if(!self_data.devices) {
                 str += `（未挂载）`;
             }
@@ -445,7 +627,7 @@ const bcachefs = {
             }
         };
         let umount = async()=> {
-            let ret = await bcachefs.mount(self_data);
+            let ret = await bcachefs.umount(self_data);
             if(ret.ret == 0) {
                 self_data.set("state", "ok");
                 bcachefs.update_info(self_data);
@@ -457,26 +639,32 @@ const bcachefs = {
             let [state, update] = useState(0);
             useEffect(()=> {
                 let w = self_data.watch('status', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 let d = self_data.watch('devices', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 return ()=> {
                     self_data.unwatch('status', w);
                     self_data.unwatch('devices', w);
                 };
-            });
+            },[]);
             if(self_data.status == 'ok') {
                 if(self_data.devices) {
                     return <RixButton className="button success" onClick={umount}>卸载</RixButton>;
                 }
+            }
+            if(self_data.status == 'ready') {
+                if(self_data.devices) {
                 return <RixButton className="button success" onClick={mount}>挂载</RixButton>;
+                }
             }
             return <></>;
         };
         let add_device_to_pool = async (data)=> {
             console.log("bcachefs add_device_to_pool==", data);
+            if(self_data.mount_option == '') {
+            }
             let  ret = await bcachefs.device.add(data);
             if(ret.ret == 0) {
                 bcachefs.update_info(self_data);
@@ -495,22 +683,79 @@ const bcachefs = {
                 content: <bcachefs.AddDevice data={config} schema="bcachefs_add_device" id={id} onSave={add_device_to_pool}/>
             });
         };
+        let init_pool = ()=> {
+            let id = 'dialog_'+Date.now();
+            let config = {
+                uuid: self_data.uuid,
+                mount_path: self_data.mount_path,
+            };
+            let save = (data)=> {
+                console.log("init_pool data=", data);
+                self_data.devices = data.devices.map(v=> {
+                    return {
+                        label: v.label,
+                        path: v.path
+                    };
+                });
+                let index = global_data.pools.findIndex(v=>v.uuid == self_data.uuid);
+                if(index >= 0) {
+                    let add_data = {
+                        name: self_data.name,
+                        mount_option: "",
+                        type: "bcachefs",
+                        uuid: self_data.uuid,
+                        devices: self_data.devices,
+                        mount_path: self_data.mount_path
+                    };
+                    global_data.pools.splice(index, 1, add_data);
+                    global_data.update('pools');
+                    console.log("set_data====", self_data);
+                    self_data.update('devices');
+                    self_data.set('status', "ready");
+                    let pools = global_data.pools;
+                    api.config_file({
+                        filename: '/app/config/pools.config',
+                        'op': 'put',
+                        data: JSON.stringify(pools)
+                    }).then(ret=> {
+                        console.log("save orig===", ret);
+                        if(ret.ret == 0) {
+                            return 0;
+                            //mydialog.current.close();
+                        }
+                        return -2;
+                    });
+                }
+                return -2;
+            };
+            openDialog({
+                id,
+                content: <bcachefs.InitPool data={self_data} schema="bcachefs_init" id={id} onSave={save}/>
+            });
+
+        };
         let AddDevice = ()=> {
             let [state, update] = useState(0);
             useEffect(()=> {
                 let w = self_data.watch('status', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 let d = self_data.watch('devices', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 return ()=> {
                     self_data.unwatch('state', w);
                     self_data.unwatch('devices', w);
                 };
-            });
+            },[]);
             if(self_data.devices&&self_data.status == 'ok') {
                 return <RixButton className="button success" onClick={add_device}>添加</RixButton>;
+            }
+            console.log("self_data==", self_data);
+            if(self_data.devices.length == 0) {
+                return <RixButton className="button alert" onClick={init_pool}>初始化</RixButton>;
+            } else {
+                return <RixButton className="button alert" onClick={init_pool}>重置</RixButton>;
             }
             return <></>;
         };
@@ -522,12 +767,12 @@ const bcachefs = {
             let [state, update] = useState(0);
             useEffect(()=> {
                 let w = self_data.watch('info', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 return ()=> {
                     self_data.unwatch('info', w);
                 };
-            });
+            },[]);
             if(self_data.info&&self_data.info != '') {
                 return <span>{self_data.info}</span>;
             }
@@ -537,12 +782,12 @@ const bcachefs = {
             let [state, update] = useState(0);
             useEffect(()=> {
                 let w = self_data.watch('devices', ()=> {
-                    update(state+1);
+                    update(prev=>prev+1);
                 });
                 return ()=> {
                     self_data.unwatch('devices', w);
                 };
-            });
+            },[]);
             let remove = async (e,{row})=> {
                 let temp_cmd = `#/bin/bash
 nohup bcachefs device remove ${row.devid} ${self_data.mount_path} &> /dev/null &
@@ -571,12 +816,12 @@ nohup bcachefs device remove ${row.devid} ${self_data.mount_path} &> /dev/null &
                     let [state, update] = useState(0);
                     useEffect(()=> {
                         let w= self_data.watch('status', ()=> {
-                            update(state+1);
+                            update(prev=>prev+1);
                         });
                         return ()=> {
                             self_data.unwatch('status', w);
                         };
-                    });
+                    },[]);
                     if(self_data.status != 'ok') return <></>;
                     if(self_data.devices.length > 1) {
                         return <><RixButton className="button success" onClick={(e)=>remove(e,{row})}>移除</RixButton>

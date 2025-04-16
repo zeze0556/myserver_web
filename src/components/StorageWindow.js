@@ -1,4 +1,5 @@
 import React, {forwardRef,useState, Fragment,useEffect, useRef, useContext } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import RixWindow from "../rix/RixWindow";
 import RixShortList from "../rix/RixShortList";
 import RixSidebar from "../rix/RixAside";
@@ -9,7 +10,7 @@ import RixTable from "../rix/RixTable";
 import RixTemplate from "../rix/RixTemplate";
 import {useWindowManager} from "../rix/RixWindowManager";
 import Config_Schema from "./config_schema.js";
-import {useData, DataContext, rix_make_watch_data} from "../store/global_data.js";
+import {context_value, useData, DataContext, rix_make_watch_data} from "../store/global_data.js";
 //import api from '../api';
 import BlockDevice from "./BlockDevice";
 import Pool from './Pools';
@@ -17,6 +18,8 @@ import JsonEditorForm from './JsonEditorForm';
 import Bcachefs from '../utils/bcachefs';
 import btrfs from '../utils/btrfs';
 import Disks from "../utils/disks";
+
+const {global_data, api, make_watch_data} = context_value;
 
 const AddDevice=(props)=> {
     let {windows, getApps, openWindow, set_window_ref, openDialog, closeDialog}= useWindowManager();
@@ -629,53 +632,6 @@ nohup btrfs device remove ${row.devid} ${self_data.mount_path} &> /dev/null &
     'bcachefs': {
         "command": "bcachefs",
         "args": ["fs", "usage", "-h"],
-        "parse":(input)=> {
-            console.log("bcachefs res=", input);
-            const uuidMatch = input.match(/Filesystem:\s*([a-f0-9-]+)/i);
-            const uuid = uuidMatch ? uuidMatch[1] : null;
-
-            // Extract Size, Used, and Online reserved
-            const sizeMatch = input.match(/Size:\s*([\d.]+\s*[TGMK]iB)/i);
-            const size = sizeMatch ? sizeMatch[1] : null;
-
-            const usedMatch = input.match(/Used:\s*([\d.]+\s*[TGMK]iB)/i);
-            const used = usedMatch ? usedMatch[1] : null;
-
-            const reservedMatch = input.match(/Online reserved:\s*([\d.]+\s*[TGMK]iB)/i);
-            const reserved = reservedMatch ? reservedMatch[1] : null;
-            // Function to extract size information for a device section
-            function extractDeviceInfo(text, deviceStart) {
-                const freeMatch = text.slice(deviceStart).match(/free:\s*([\d.]+\s*[TGMK]iB)/);
-                const capacityMatch = text.slice(deviceStart).match(/capacity:\s*([\d.]+\s*[TGMK]iB)/);
-                return {
-                    free: freeMatch ? freeMatch[1].trim() : null,
-                    capacity: capacityMatch ? capacityMatch[1].trim() : null
-                };
-            }
-            // Extract device information
-            //const deviceRegex = /(\w+\.\w+)\s+\(device\s+(\d+)\):\s+(\w+)\s+(rw|ro)/g;
-            const deviceRegex = /([\w.-]+(?:_[\w.-]+)*)\s*\(device\s+(\d+)\):\s*(\w+)\s+(rw|ro)/g;
-            let devices = [];
-            let match;
-            while ((match = deviceRegex.exec(input)) !== null) {
-                const deviceInfo = extractDeviceInfo(input, match.index);
-                devices.push({
-                    type: match[1],
-                    deviceId: match[2],
-                    deviceName: match[3],
-                    mode: match[4],
-                    ...deviceInfo
-                });
-            }
-            console.log("devices==", JSON.stringify(devices));
-            return {
-                uuid: uuid,
-                size: size,
-                used: used,
-                reserved: reserved,
-                devices: devices
-            };
-        },
         Rend(props){
             let data = props.data;
             return <Bcachefs.Render data={data}>
@@ -715,6 +671,51 @@ let update_pools = async (global_data, api)=> {
     }
     };
 
+const AddPool = (props)=>{
+    let jsonEditorFormRef = useRef(null);
+    let schema = {
+        ...Config_Schema,
+        "$ref": `#/definitions/add_pool`
+    };
+    let config = {};
+    let {closeDialog}= useWindowManager();
+    let save = ()=> {
+        let data = jsonEditorFormRef.current.getValue();
+        let pools = global_data.pools || [];
+        data.uuid = uuidv4();
+        /*
+        let index = pools.findIndex(v=>v.uuid == data.uuid);
+        if(index>=0) {
+            pools.splice(index, 1, data);
+        } else
+        */
+        {
+            pools.push(data);
+        }
+        console.log("pools=", pools);
+        global_data.set('pools', pools);
+        api.config_file({
+            filename: '/app/config/pools.config',
+            'op': 'put',
+            data: JSON.stringify(pools)
+        }).then(ret=> {
+            if(ret.ret == 0) {
+                closeDialog(props.id);
+                //mydialog.current.close();
+            }
+        });
+
+    };
+    return <RixDialog id={props.id}>
+        <div type="title">添加存储池</div>
+        <div type="content">
+        <JsonEditorForm schema={schema} ref={jsonEditorFormRef} data={config}/>
+        </div>
+        <button type="action" className="button" onClick={save}>确定</button>
+        <button type="action" className="button js-dialog-close">取消</button>
+        </RixDialog>;
+};
+
 const StorageWindow = forwardRef((props, ref) => {
     const {global_data, api} = useData();
     let {windows, getApps, openWindow, set_window_ref, openDialog, closeDialog}= useWindowManager();
@@ -727,6 +728,7 @@ const StorageWindow = forwardRef((props, ref) => {
         openAddDialog: false,
         schema:{},
         scan_pool_list:[],
+        update:0,
         //disks_health:[],
         data: { id: 0, key: '', status: 0, type: 0, value: '', parent_id: 0 }
     });
@@ -766,7 +768,7 @@ const StorageWindow = forwardRef((props, ref) => {
         };
         openDialog({
             id,
-            content: <RixDialog id={id}><div type="ttitle">aaaa</div><div type="content">dddd</div><button type="action" onClick={test}> test</button></RixDialog>
+            content: <AddPool id={id}/>
         });
     };
     let scan=async ()=> {
@@ -850,18 +852,35 @@ const StorageWindow = forwardRef((props, ref) => {
         let pools = [];
         useEffect(()=> {
             let w = state.watch('scan_pool_list', ()=> {
-                setupdate(update+1);
+                if(update != global_data.pools.length+state.scan_pool_list.length) {
+                    update = global_data.pools.length+state.scan_pool_list.length;
+                    setupdate(update);
+                }
+                //setupdate(update+1);
+            });
+            let pools_update = global_data.watch('pools', (v)=> {
+                if(update != v.length+state.scan_pool_list.length) {
+                    update = v.length+state.scan_pool_list.length;
+                    setupdate(update);
+                }
             });
             return ()=> {
                 state.unwatch(w);
+                global_data.unwatch('pools', pools_update);
             };
-        });
-        console.log("global_data==", global_data);
+        },[]);
+        console.log("global_data==", global_data.pools, state.scan_pool_list);
         let pool_list = [...global_data.pools, ...state.scan_pool_list];//state.scan_pool_list;
         for(let pool of pool_list) {
-            console.log("ready pool==", pool);
-            let Rend = filesystem_proc[pool.type].Rend;
-            pools.push(<div key={pool.uuid}><Rend data={pool} /></div>);
+            switch(pool.type) {
+            case 'bcachefs1':
+                pools.push(<div key={pool.uuid}><Bcachefs.Render data={pool} /></div>);
+                break;
+            default:
+                let Rend = filesystem_proc[pool.type].Rend;
+                pools.push(<div key={pool.uuid}><Rend data={pool} /></div>);
+                break;
+            }
         }
         return pools;
     };

@@ -329,6 +329,62 @@ const config_schema = {
                 "device"
             ]
         },
+        'add_pool': {
+            "type": "object",
+            "title": "配置",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "default": "",
+                    "title": "名称"
+                },
+                "auto_mount": {
+                    "type": "boolean",
+                    "default": true,
+                    "title": "自动挂载"
+                },
+                "mount_path": {
+                    "type": "string",
+                    "title": "挂载路径"
+                },
+                "mount_option": {
+                    "type": "string",
+                    "title": "挂载参数",
+                    "options": {
+                        "hidden": true
+                    }
+                },
+                "type": {
+                    "type": "string",
+                    "title": "分区格式",
+                    "default": "bcachefs",
+                    "enum": [
+                        "btrfs",
+                        "bcachefs"
+                    ],
+                    "options": {
+                        "enum_titles": [
+                            "btrfs",
+                            "bcachefs"
+                        ]
+                    }
+                },
+                "uuid": {
+                    "type": "string",
+                    "title": "uuid",
+                    "options": {
+                        "hidden": true
+                    }
+                }
+            },
+            "required": [
+                "uuid",
+                "type",
+                "name",
+                "mount_path",
+                "mount_option",
+            ]
+        },
         'modify_pool': {
             "type": "object",
             "title": "配置",

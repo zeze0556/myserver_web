@@ -9,6 +9,7 @@ import Config_Schema from "./config_schema.js";
 import Docker from "../utils/docker";
 import System from "../utils/system";
 import Cron from "../utils/cron";
+import Disks from "../utils/disks";
 import Persistence from "../utils/persistence";
 import {useData, DataContext, rix_make_watch_data} from "../store/global_data.js";
 import JsonEditorForm from './JsonEditorForm';
@@ -34,7 +35,8 @@ let view_config = {
     'docker': (props)=> {return <Docker.RendSetting {...props}/>;},
     'virtual': (props)=> {return <VMSetting {...props}/>;},
     'cron': (props)=> { return <Cron.Render {...props}/>;},
-    'system_other': (props)=> {return <System.Other {...props}/>;}
+    'system_other': (props)=> {return <System.Other {...props}/>;},
+    'disks':(props)=> { return <Disks.Render {...props}/>; }
 };
 const SystemSetting = forwardRef((props, ref)=> {
     let toggle_ref = React.createRef();
@@ -76,6 +78,7 @@ const SystemSetting = forwardRef((props, ref)=> {
             <li><a data-menu="virtual"><span className="mif-files-empty icon"></span>虚拟机设置</a></li>
             <li><a data-menu="cron"><span className="mif-files-empty icon"></span>定时任务</a></li>
             <li><a data-menu="system_other"><span className="mif-files-empty icon"></span>杂项</a></li>
+            <li><a data-menu="disks"><span className="mif-files-empty icon"></span>磁盘管理</a></li>
             <li className="divider"></li>
             </RixSidebar>
             <div className="shifted-content h-100 p-ab" ref={shift_ref}>

@@ -96,7 +96,7 @@ export default function RixSelect(props) {
     let onChange = (e)=>{
         var select = Metro.getPlugin(ref.current, 'select');
         if(!select) return;
-        console.log("select==", select);
+        //console.log("select==", select);
         if(props.onChange) {
             props.onChange(e,select.val());
         }
@@ -107,23 +107,4 @@ export default function RixSelect(props) {
             >{
         props.children
     }</select>);
-    /*
-    return (<select data-role="select" multiple onChange={onChange}>
-        <optgroup label="Physical servers">
-        <option value="dedicated_corei3_hp">Core i3 (hp)</option>
-        <option value="dedicated_pentium_hp">Pentium (hp)</option>
-        <option value="dedicated_smart_corei3_hp">Smart Core i3 (hp)</option>
-        </optgroup>
-        <optgroup label="Virtual hosting">
-        <option value="mini">Mini</option>
-        <option value="site">Site</option>
-        <option value="portal">Portal</option>
-        </optgroup>
-        <optgroup label="Virtual servers">
-        <option value="evps0">eVPS-TEST (30 дней)</option>
-        <option value="evps1">eVPS-1</option>
-        <option value="evps2">eVPS-2</option>
-        </optgroup>
-        </select>);
-        */
 }
