@@ -319,6 +319,42 @@ const bcachefs = {
             <button type="action" className="button js-dialog-close" onClick={close}>取消</button>
             </RixDialog>;
     },
+    ModifyPool(props) {
+        let {windows, getApps, openWindow, set_window_ref, openDialog, closeDialog}= useWindowManager();
+        let jsonEditorFormRef = useRef(null);
+        let data = props.data;
+        let config = {
+            name: data?.name??'',
+            auto_mount: data?.auto_mount??true,
+            mount_option: data?.mount_option??'',
+            type: 'bcachefs',
+            mount_path: data?.mount_path??'',
+            uuid: data?.uuid??'',
+        };
+        let save = async ()=> {
+            let data = jsonEditorFormRef.current.getValue();
+            let ret = await props.onSave(data);
+            console.log("save ret====", ret);
+            if(ret) {
+                closeDialog(props.id);
+            }
+        };
+        let close = ()=> {
+        };
+        let schema = {
+            ...Config_Schema,
+            "$ref": `#/definitions/${props.schema}`
+        };
+        let title = `修改参数（下次启动）`;
+        // <div type="title"><Title/></div>
+            return <RixDialog id={props.id}>
+            <div type="content">
+            <JsonEditorForm schema={schema} ref={jsonEditorFormRef} data={config}/>
+            </div>
+            <button type="action" className="button primary" onClick={save}>保存</button>
+            <button type="action" className="button js-dialog-close" onClick={close}>取消</button>
+            </RixDialog>;
+    },
     InitPool(props) {
         let {windows, getApps, openWindow, set_window_ref, openDialog, closeDialog}= useWindowManager();
         let jsonEditorFormRef = useRef(null);
@@ -540,6 +576,7 @@ const bcachefs = {
         };
         let savepool = async (data) => {
             let pools = global_data.pools || [];
+            data.devices = data.devices||self_data.devices;
             let index = pools.findIndex(v=>v.uuid == data.uuid);
             if(index>=0) {
                 pools.splice(index, 1, data);
@@ -760,6 +797,18 @@ const bcachefs = {
             return <></>;
         };
         let Modify = ()=> {
+            let click = ()=> {
+                //modify(self_data);
+                console.log("modify====", self_data);
+                let id = 'dialog_'+Date.now();
+                let config = self_data;
+                openDialog({
+                    id,
+                    content: <bcachefs.ModifyPool data={config} schema="modify_pool" id={id} onSave={savepool}/>
+                });
+            };
+            return <RixButton className="button success" onClick={click}>修改</RixButton>;
+            return <></>;
         };
         let Balance = ()=> {
         };
