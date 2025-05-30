@@ -55,6 +55,7 @@ export default class RixShortList extends Component {
                     for(let index = 0; index< shortlist.length; index++) {
                         let v = shortlist[index];
                         let node = view.add(null, {...v.props, icon: 'empty'});
+                        if(!node) continue;
                         const root = createRoot(node.find(".icon")[0]);
                         root.render(v.props.icon);
                         node.data("id", v.props.id);
