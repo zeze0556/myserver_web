@@ -27,6 +27,7 @@ const bcachefs = {
             let args = [];
             args.push("fs");
             args.push("usage");
+            args.push("-a");
             args.push(path);
             return {
                 command: "bcachefs",
@@ -242,7 +243,7 @@ const bcachefs = {
         };
     },
     async info(path) {
-        let ret = await api.run_command({command: "bcachefs", args: ['fs', 'usage', "-h", path]});
+        let ret = await api.run_command({command: "bcachefs", args: ['fs', 'usage', "-a", "-h", path]});
         if(ret.ret == 0) {
             let info = bcachefs.parse(ret.data.stdout, path);
             console.log("info.devices===", info.devices, path);
@@ -655,6 +656,7 @@ const bcachefs = {
             return <RixButton className="button success" onClick={add_to_pool}>注册</RixButton>;
         };
         let mount = async()=> {
+            await Disks.mkdir(`${self_data.mount_path}`);
             let ret = bcachefs.mount(self_data);
             if(ret.ret == 0) {
                 self_data.set("state", "ok");
@@ -789,7 +791,7 @@ const bcachefs = {
                 return <RixButton className="button success" onClick={add_device}>添加</RixButton>;
             }
             console.log("self_data==", self_data);
-            if(self_data.devices.length == 0) {
+            if(self_data.status == 'ready') {
                 return <RixButton className="button alert" onClick={init_pool}>初始化</RixButton>;
             } else {
                 return <RixButton className="button alert" onClick={init_pool}>重置</RixButton>;

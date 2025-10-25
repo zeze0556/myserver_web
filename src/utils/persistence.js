@@ -91,7 +91,7 @@ const Persistence = {
             let [count, update] = useState(0);
             let save_config = (config)=> {
                 api.config_file({
-                    filename: '/tmp/ventoy/ventoy/ventoy.config',
+                    filename: '/tmp/ventoy/ventoy/ventoy.json',
                     'op': 'put',
                     data: JSON.stringify(config)
                 }).then(ret=> {
@@ -188,7 +188,19 @@ const Persistence = {
     },
     VentoySetting(props) {
         let {windows, getApps, openWindow, set_window_ref, openDialog}= useWindowManager();
+        //console.log("VentoySetting props===", props.data);
         let part = props.data.children.filter(v=>v.label == 'Ventoy')[0];
+        if(part.children&&part.children.length > 0) {
+            let f = part.children.filter(v=>{
+                if(v.ro == false && v.type == 'dm') {
+                    return true;
+                }
+                return false;
+            })[0];
+            if(f) {
+                part = f;
+            }
+        }
         let self_data = rix_make_watch_data({...part,
                                              mounted: false
                                             });
@@ -213,10 +225,12 @@ const Persistence = {
                     command: 'mkdir',
                     args: ['-p', '/tmp/ventoy']
                 });
+                const path = self_data.path.split('/').pop();
+                console.log("use====", self_data);
                 let ret = await api.run_command({
                     "command": "mount",
                     "args": [
-                        self_data.path,
+                        `${self_data.path}`,
                         '/tmp/ventoy'
                     ]
                 });
@@ -280,7 +294,7 @@ const Persistence = {
                 let conf_replace = {};
                 if(config&&config.conf_replace) {
                     let f = config.conf_replace.filter(v=>{
-                        if(v.iso.endsWith('live-image-amd64.hybrid.iso')) {
+                        if(v.iso.endsWith('mynas-image-amd64.hybrid.iso')) {
                             return true;
                         }
                         return false;
@@ -292,7 +306,7 @@ const Persistence = {
                 if(!conf_replace.iso) {
                     let iso = await api.run_command({
                         command: 'find',
-                        args: ["/tmp/ventoy -type f -name live-image-amd64.hybrid.iso"]
+                        args: ["/tmp/ventoy -type f -name mynas-image-amd64.hybrid.iso"]
                     });
                     if(iso.ret == 0) {
                         if(iso.data.stdout != '') {
@@ -324,7 +338,7 @@ label live-rix-failsafe
         append boot=live components memtest noapic noapm nodma nomce nolapic nosmp nosplash vga=788
 `;
                 if(conf_replace.new) {
-                    let config = await api.config_file({ filename: `/tmp/ventoy${conf_replace.new}`, 'op': "get" });
+                    let config = await api.config_file({ filename: `/tmp/ventoy/ventoy/ventoy.json`, 'op': "get" });
                     if(config&&!config.ret) {
                         default_conf = config;
                     }

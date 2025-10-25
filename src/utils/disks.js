@@ -317,7 +317,7 @@ const disks = {
             }
             let format = <></>;
             if(!row.use_state) {
-                format = <RixButton className="button alert" onClick={(e)=>console(e,{row})}>格式化</RixButton>;
+                format = <RixButton className="button alert" onClick={(e)=>console.log(e,{row})}>格式化</RixButton>;
             }
             return <>
                 {format}
@@ -540,9 +540,10 @@ const disks = {
                 uuid: uuidv4(),
             };
             config.keyfile = `/app/cryptsetup_keyfiles/${config.uuid}.key`;
-            let save = ()=> {
+            let save = async ()=> {
                 let data = jsonEditorFormRef.current.getValue();
                 console.log("save==", data);
+                await disks.mkdir(`/app/cryptsetup_keyfiles`);
                  api.run_command({command: "dd",
                                   args: [
                                       `if=/dev/urandom`,
@@ -566,7 +567,13 @@ const disks = {
                                                  data.by = 'by-path';
                                                  data['by-path'] = data.path;
                                              }
-                                             let config = await disks.cryptsetup.get_config();
+                                             let config = null;
+                                             try {
+                                             config = await disks.cryptsetup.get_config();
+                                             } catch (e) {
+                                                 console.log("cryptsetup get_config error=", e);
+                                                 config = null;
+                                             }
                                              if(!config) {
                                                  config = {
                                                      children:[]
@@ -862,7 +869,7 @@ const disks = {
 
         let Rend_Luks = ({row})=> {
             if(row.fstype == 'crypto_LUKS') {
-                if(row.children.length > 0) {
+                if(row.children&&row.children.length > 0) {
                     let c = row.children.filter(v=>v.type == 'crypt')[0];
                     if(c) {
                         return <>
