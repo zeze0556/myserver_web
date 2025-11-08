@@ -1,10 +1,95 @@
 import React, {useState, useEffect, useRef, useContext, forwardRef, useImperativeHandle, Fragment } from 'react';
 import ReactDOM from 'react-dom/client';
-import { DataProvider, useData,rix_make_watch_data, DataContext } from "../store/global_data.js";
+import { DataProvider, useData,rix_make_watch_data, DataContext, context_value } from "../store/global_data.js";
 import RixSelect from "../rix/RixSelect";
 import {Autocomplete, TextField} from '@mui/material';
 
 let JSONEditor = window.JSONEditor;
+
+class Disk_Select_Without_Part extends JSONEditor.AbstractEditor{
+    build() {
+        let value = this.value;
+        let self = this;
+        this.title = this.header = this.label = this.theme.getFormInputLabel(this.getTitle(), this.isRequired());
+        this.container.appendChild(this.title);
+        let select_options = this.options;
+        let disks = this.options.disks;
+        if(!disks) {
+            const {global_data, api, make_watch_data} = context_value;
+            let list = global_data.get('blockdevices').filter(v=>v.type == 'disk' &&v.id);
+            let canuse = [];
+            for (let disk of list) {
+                if(!select_options.part_check) {
+                    canuse.push(disk);
+                    continue;
+                }
+            }
+            disks = canuse;
+        }
+        this.disks = disks;
+        const div = document.createElement('div');
+        this.container.append(div);
+        this.view_root = ReactDOM.createRoot(div);
+        this.rix_init_flag = false;
+        let onChange = (e, v)=> {
+            e.preventDefault();
+            let disk = disks.filter(v2=>v2.path ==v)[0];
+            if(disk) {
+                let real_v = disk[select_options?.get_prop??'path'];
+                this.setValue(real_v, false, false);
+            }
+        };
+        this.used_disks = rix_make_watch_data({used:[], cur_path:''});
+        if(this.parent.parent&&this.parent.parent.schema.uniqueItems) {
+            let cur_list = this.parent.parent;
+            this.jsoneditor.watch(cur_list.path, ()=> {
+                let v2 = cur_list.getValue();
+                let list = v2.map(v=>v.path);
+                this.used_disks.set('used', list);
+            });
+        }
+        this.set_model = (v)=> {
+            if (self.parent && self.parent.jsoneditor) {
+                let pr = self.parent.jsoneditor.getEditor(self.parent.path + '.model');
+                if (pr && self.disks) {
+                    let v2 = v;
+                    let model = self.disks.filter(v => v.path == v2)[0];
+                    if (model) {
+                        pr.setValue(model.model);
+                    }
+                }
+            }
+        };
+        this.used_disks.watch('cur_path', this.set_model);
+        let MyRender = ()=> {
+            let value = this.used_disks.get('cur_path', '');
+            return (<RixSelect onChange={onChange} value={value}>
+                      {disks.map(disk => <option key={disk.path} value={disk.path}>{`${disk.model}(${disk.size}) at ${disk.path}`}</option>)}
+                    </RixSelect>);
+        };
+        if(this.view_root && this.rix_init_flag) return;
+        this.view_root.render(<MyRender/>);
+        this.rix_init_flag = true;
+    }
+    setValue(v, init, fromTemplate) {
+        if(this.value === v) return;
+        this.value = v;
+        this.refreshValue();
+        let temp_disk = (this?.disks??[]).filter(v2=>v2[this.options?.get_prop??'path'] == v)[0];
+        this.used_disks.set("cur_path", temp_disk?.path??v);
+        this.onChange(true);
+    }
+    getValue() {
+        return this.value;
+    }
+    destroy() {
+        this.used_disks.unwatch(this.set_model);
+        setTimeout(()=> {
+        this.view_root?.unmount();
+            this.rix_init_flag = false;
+        });
+    }
+}
 
 
 class Disk_Select extends JSONEditor.AbstractEditor{
@@ -54,7 +139,6 @@ class Disk_Select extends JSONEditor.AbstractEditor{
             const [value, setValue] = useState('');
             if(!disks) {
                 let list = global_data.get('blockdevices');
-                console.log("disks===", list);
                 let canuse = [];
                 for (let disk of list) {
                     if(!disk.children) {
@@ -115,7 +199,6 @@ class Disk_Select extends JSONEditor.AbstractEditor{
             },[]);
             let Options = ()=> {
                 let ret = [];
-                //console.log("disks===", disks);
                 let RenderChilder = (v)=> {
                     let type = v.fstype;
                     if(!v.fstype) {
@@ -126,7 +209,6 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                 for(let disk of disks) {
                     if(disk.children&&disk.children.length > 0) {
                         let children = [];
-                        console.log("disk =", disk, children);
                         let uuid = disk.uuid || disk.path;
                         let c_check = true;
                         if(disk.children&&disk.children.length>=1) {
@@ -155,7 +237,6 @@ class Disk_Select extends JSONEditor.AbstractEditor{
                                  {children}
                                  </optgroup>);
                     } else {
-                        //console.log("disk =", disk);
                         let title = `${disk.model}(${disk.size}) at ${disk.path}`;
                         let uuid = disk.uuid || disk.path;
                         ret.push(<optgroup label={title} key={uuid}>
@@ -296,6 +377,7 @@ const JsonEditorForm = forwardRef((props, ref) => {
     const {global_data} = useContext(DataContext);
     let [update, setUpdate] = useState(0);
     JSONEditor.defaults.editors.disk_select= Disk_Select;
+    JSONEditor.defaults.editors.disk_select_without_part = Disk_Select_Without_Part;
     JSONEditor.defaults.global_data = global_data;
     JSONEditor.defaults.editors.pool_select = Pool_Select;
     JSONEditor.defaults.options.keep_oneof_values = false;
@@ -305,6 +387,9 @@ const JsonEditorForm = forwardRef((props, ref) => {
         }
         if (schema.type === 'string' && schema.format === 'pool_select') {
             return 'pool_select';
+        }
+        if (schema.format === 'disk_select_without_part') {
+            return 'disk_select_without_part';
         }
     });
     useEffect(() => {

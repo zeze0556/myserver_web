@@ -36,7 +36,7 @@ const disks = {
     },
     parseSizeAndUnit(input) {
         // 匹配数字和单位的正则表达式
-        const match = input.match(/^(\d+\.?\d*)\s*([GMK]?)$/i);
+        const match = input.match(/^(\d+\.?\d*)\s*([GMKT]?)$/i);
 
         if (match) {
             const size = Math.round(parseFloat(match[1]));
@@ -45,6 +45,9 @@ const disks = {
             // 根据单位转换大小
             let newSize;
             switch (unit) {
+            case 'T':
+                newSize = size * 1024 * 1024 * 1024*1024;
+                break;
             case 'G':
                 newSize = size * 1024 * 1024 * 1024;
                 break;
@@ -125,6 +128,113 @@ const disks = {
         }
         return false;
 
+    },
+    parseSizeToBytes(sizeStr) {
+        if (!sizeStr) return 0;
+
+        const units = {
+            B: 1,
+            KB: 1000,
+            K: 1000,
+            KIB: 1024,
+            M: 1000 ** 2,
+            MB: 1000 ** 2,
+            MIB: 1024 ** 2,
+            G: 1000 ** 3,
+            GB: 1000 ** 3,
+            GIB: 1024 ** 3,
+            T: 1000 ** 4,
+            TB: 1000 ** 4,
+            TIB: 1024 ** 4,
+            P: 1000 ** 5,
+            PB: 1000 ** 5,
+            PIB: 1024 ** 5
+        };
+
+        // 提取数值 + 单位
+        const match = String(sizeStr).trim().toUpperCase().match(/^([\d.]+)\s*([KMGTPE]?I?B?)$/);
+        if (!match) return NaN;
+
+        const value = parseFloat(match[1]);
+        const unit = match[2] || 'B';
+
+        return value * (units[unit] || 1);
+    },
+    get_part_usage(device) {
+        let used = 0;
+        let pools = global_data.get('pools', []);
+        for(let child of device.children) {
+            if(child.children&&child.children.length > 0) {
+                used += this.get_part_usage(child);
+                return used;
+            }
+            switch(child.fstype) {
+            case 'ext4': {
+                used += this.parseSizeToBytes(child.fsused);
+            }
+                break;
+            case 'btrfs': {
+                let uuid = child.uuid;
+                let pool = pools.filter(v=>v.uuid == uuid)[0];
+                if(pool) {
+                    let dev = pool.devices.filter(v=>v.path == child.path)[0];
+                    if(dev) {
+                        used += this.parseSizeToBytes(dev.used);
+                    }
+                } else {
+                    used += this.parseSizeToBytes(child.fsused);
+                }
+            }
+                break;
+            case 'bcachefs': {
+                let uuid = child.uuid;
+                let pool = pools.filter(v=>v.uuid == uuid)[0];
+                if(pool) {
+                    let dev = pool.devices.filter(v=>v.path == child.path)[0];
+                    if(dev) {
+                        let noused = this.parseSizeToBytes(dev.free);
+                        let size = this.parseSizeToBytes(dev.capacity);
+                        used += size - noused;
+                    }
+                } else {
+                    used += this.parseSizeToBytes(child.fsused);
+                }
+            }
+                break;
+            }
+        }
+        return used;
+    },
+    get_disk_usage(path) {
+        let device = global_data.get('blockdevices', []).filter(v=>{
+            return v.path == path;
+        })[0];
+        let pools = global_data.get('pools', []);
+        if(device) {
+            //let used = 0;
+            let all_size = this.parseSizeToBytes(device.size);
+            let used = this.get_part_usage(device);
+            /*
+            for(let child of device.children) {
+                switch(child.fstype) {
+                case 'btrfs': {
+                    let uuid = child.uuid;
+                    let pool = pools.filter(v=>v.uuid == uuid)[0];
+                    if(pool) {
+                        let dev = pool.devices.filter(v=>v.path == child.path)[0];
+                        if(dev) {
+                            used += this.parseSizeToBytes(dev.used);
+                        }
+                    } else {
+                        used += this.parseSizeToBytes(child.fsused);
+                    }
+                }
+                    break;
+                }
+            }*/
+            return {used: used, size:all_size};
+        }
+        return {used:0, size:0};
     },
     get_device(path) {
         let devices= global_data.get('blockdevices', []);

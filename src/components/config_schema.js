@@ -888,6 +888,76 @@ const config_schema = {
                 "discard",
                 "bucket",
             ]
+        },
+        "disks_info": {
+            "type": "object",
+            "title": "设备",
+            "properties": {
+                "label": {
+                    "type": "string",
+                    "title": "标签",
+                },
+                "id-link": {
+                    "type": "string",
+                    "title": "设备路径",
+                    "format": "disk_select_without_part",
+                    "options": {
+                        "get_prop": "id-link",
+                        "mount_check": false,
+                        "part_check": false
+                    }
+                },
+                /*
+                "size": {
+                    "type": "string",
+                    "title": "容量"
+                }*/
+            },
+            "required": [
+                "label",
+                "id-link",
+                //"size"
+            ]
+        },
+        "diskarray_setting": {
+            "title": "阵列设置",
+            "type": "object",
+            "properties": {
+                "perRow": {
+                    "type": "integer",
+                    "title": "每行数量",
+                    "default": 6
+                },
+                "orientation": {
+                    "type": "string",
+                    "title": "方向",
+                    "default": "vertical",
+                    "enum": [
+                        "vertical",
+                        "horizontal",
+                    ],
+                    "options": {
+                        "enum_titles": [
+                            "垂直",
+                            "水平",
+                        ]
+                    }
+                },
+                "disks": {
+                    "type": "array",
+                    "title": "阵列磁盘",
+                    "default":[],
+                    //"format": "table",
+                    "items": {
+                        "$ref": "#/definitions/disks_info"
+                    }
+                },
+            },
+            "required": [
+                "perRow",
+                "orientation",
+                "disks"
+            ]
         }
     }
 };

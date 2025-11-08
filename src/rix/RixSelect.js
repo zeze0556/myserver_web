@@ -96,15 +96,15 @@ export default function RixSelect(props) {
     let onChange = (e)=>{
         var select = Metro.getPlugin(ref.current, 'select');
         if(!select) return;
-        //console.log("select==", select);
         if(props.onChange) {
             props.onChange(e,select.val());
         }
     };
-    
-    return (<select ref={ref} data-role="select" multiple={props.multiple} defaultValue={props.value}
+    return (<select ref={ref} data-role="select" multiple={props.multiple} value={props.value}
             onChange={onChange}
             >{
         props.children
     }</select>);
 }
+
+

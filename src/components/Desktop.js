@@ -1,6 +1,6 @@
 // Desktop.js
 import React, { Fragment, useRef, useState, useEffect } from 'react';
-import './descktop.css';
+import './desktop.css';
 import {  Box, Paper, Typography,} from '@mui/material';
 import TaskBar from './TaskBar';
 import { useWindowManager } from '../rix/RixWindowManager';
@@ -69,6 +69,12 @@ const paths = {
         'rix_type': 'component',
         "icon": <span class="mif-chrome fg-blue"/>,
         path: 'components/Firefox.js'
+    },
+    'disk_view': {
+        'title': '磁盘监控',
+        'rix_type': 'component',
+        'icon': <span class="mif-folder fg-blue"/>,
+        path: 'components/DiskView.js'
     },
 };
 
